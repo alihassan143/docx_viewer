@@ -23,7 +23,6 @@ To use this package, follow these steps:
     ```yaml
     dependencies:
       docx_viewer: ^1.0.0
-      file_picker: ^5.2.2
     ```
 
 2. Install the dependencies by running the following command:
