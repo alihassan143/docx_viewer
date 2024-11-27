@@ -6,7 +6,6 @@ This Flutter package allows you to view DOCX files in your Flutter applications.
 
 - Allows users to pick and view DOCX files.
 - Displays the content of the DOCX file within your app.
-- Supports file selection using `file_picker` package.
 - Tries to render DOCX content as accurately as possible, although some bugs may occur in certain files.
 
 ## Limitations
