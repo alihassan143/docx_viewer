@@ -1,39 +1,107 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Flutter DOCX Viewer Package
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+This Flutter package allows you to view DOCX files in your Flutter applications. It provides a simple way to load and display DOCX content in a Flutter app.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- Allows users to pick and view DOCX files.
+- Displays the content of the DOCX file within your app.
+- Supports file selection using `file_picker` package.
+- Tries to render DOCX content as accurately as possible, although some bugs may occur in certain files.
 
-## Getting started
+## Limitations
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+- The package may not render DOCX files perfectly in all cases.
+- Some bugs are present in the rendering, and the file may not display as accurately as expected.
+- The package strives to provide a functional rendering experience, but it may not be perfect for all DOCX files.
 
-## Usage
+## Installation
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
+To use this package, follow these steps:
+
+1. Add the dependencies in your `pubspec.yaml` file:
+
+    ```yaml
+    dependencies:
+      docx_viewer: ^1.0.0
+      file_picker: ^5.2.2
+    ```
+
+2. Install the dependencies by running the following command:
+
+    ```bash
+    flutter pub get
+    ```
+
+## Example Usage
+
+Below is an example of how to use the DOCX viewer in your Flutter application:
 
 ```dart
-const like = 'sample';
-```
+import 'dart:io';
+import 'package:docx_viewer/docx_viewer.dart';
+import 'package:file_picker/file_picker.dart';
 
-## Additional information
+void main() {
+  runApp(const MyApp());
+}
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
+      ),
+      home: const MyHomePage(title: 'Docx Viewer'),
+    );
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key, required this.title});
+
+  final String title;
+
+  @override
+  State<MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  File? selectedFile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(widget.title),
+      ),
+      body: selectedFile == null
+          ? const Center(
+              child: Text("Select File"),
+            )
+          : DocxViewer(
+              file: selectedFile!,
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final file = await FilePicker.platform.pickFiles();
+          if (file == null) {
+            return;
+          }
+          final filepath = file.files.first.path!;
+          setState(() {
+            selectedFile = File(filepath);
+          });
+        },
+        tooltip: 'Select DOCX File',
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
