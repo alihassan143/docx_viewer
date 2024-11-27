@@ -22,7 +22,7 @@ To use this package, follow these steps:
 
     ```yaml
     dependencies:
-      docx_viewer: ^1.0.0
+      docx_file_viewer: ^0.0.1
     ```
 
 2. Install the dependencies by running the following command:
@@ -37,7 +37,7 @@ Below is an example of how to use the DOCX viewer in your Flutter application:
 
 ```dart
 import 'dart:io';
-import 'package:docx_viewer/docx_viewer.dart';
+import 'package:docx_file_viewer/docx_file_viewer.dart';
 import 'package:file_picker/file_picker.dart';
 
 void main() {

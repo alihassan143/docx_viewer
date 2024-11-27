@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:docx_viewer/docx_viewer.dart';
+import 'package:docx_file_viewer/docx_file_viewer.dart';
 
 class DocxViewer extends StatefulWidget {
   final File file;

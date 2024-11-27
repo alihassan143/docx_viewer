@@ -1,4 +1,4 @@
-library docx_viewer;
+library docx_file_viewer;
 
 export 'package:archive/archive.dart';
 export 'package:flutter/material.dart';

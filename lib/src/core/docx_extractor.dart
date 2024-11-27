@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:xml/xml.dart' as xml;
 
-import '../../docx_viewer.dart';
+import '../../docx_file_viewer.dart';
 
 class DocxExtractor {
   DocxExtractor._();
