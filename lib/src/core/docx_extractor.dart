@@ -1,3 +1,4 @@
+import 'dart:developer';
 import 'dart:io';
 
 import 'package:xml/xml.dart' as xml;
@@ -21,13 +22,14 @@ class DocxExtractor {
           xml.XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
       final relsXml =
           xml.XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
-
+      // log(documentXml.toXmlString());
       // Extract image relationships
       final imageMap = _extractImageRelationships(relsXml, archive);
 
       // Parse the content
       return _parseContent(documentXml, imageMap);
     } catch (e) {
+      log(e.toString());
       // Handle error, log it or provide a fallback widget
 
       return [
@@ -77,10 +79,17 @@ class DocxExtractor {
 
     // Iterate through runs (text + style) in the paragraph
     paragraph.findAllElements('w:r').forEach((run) {
-      final text = run.getElement('w:t')?.innerText ?? '';
+      log(run.innerText);
+      final text = run.getElement('w:t')?.innerText ?? run.innerText;
+      final innerText = run.innerText;
       final style = _parseRunStyle(run.getElement('w:rPr'));
 
-      if (text.isNotEmpty) {
+      if (innerText.trim().isNotEmpty) {
+        spans.add(TextSpan(
+          text: innerText,
+          style: style.copyWith(color: style.color ?? Colors.black),
+        ));
+      } else if (text.trim().isNotEmpty) {
         spans.add(TextSpan(
           text: text,
           style: style.copyWith(color: style.color ?? Colors.black),
@@ -242,6 +251,7 @@ class DocxExtractor {
 
     for (final body in documentXml.findAllElements('w:body')) {
       for (final element in body.children.whereType<xml.XmlElement>()) {
+        log(element.name.local);
         switch (element.name.local) {
           case 'p':
             widgets.add(_parseParagraph(element, imageMap));
@@ -258,9 +268,9 @@ class DocxExtractor {
           case 'sdt':
             widgets.add(_parseSdt(element, imageMap));
             break;
-          case 'sectPr':
-            widgets.add(_parseSectionProperties(element));
-            break;
+          // case 'sectPr':
+          //   widgets.add(_parseSectionProperties(element));
+          // break;
         }
       }
     }
@@ -385,35 +395,35 @@ class DocxExtractor {
     );
   }
 
-  static Widget _parseSectionProperties(xml.XmlElement sectPrElement) {
-    final pageSettings = <Widget>[];
+  // static Widget _parseSectionProperties(xml.XmlElement sectPrElement) {
+  //   final pageSettings = <Widget>[];
 
-    // Extract page size
-    final pgSz = sectPrElement.getElement('w:pgSz');
-    if (pgSz != null) {
-      final width = pgSz.getAttribute('w:w');
-      final height = pgSz.getAttribute('w:h');
-      if (width != null && height != null) {
-        pageSettings.add(Text('Page Size: ${width}x$height twips'));
-      }
-    }
+  //   // Extract page size
+  //   final pgSz = sectPrElement.getElement('w:pgSz');
+  //   if (pgSz != null) {
+  //     final width = pgSz.getAttribute('w:w');
+  //     final height = pgSz.getAttribute('w:h');
+  //     if (width != null && height != null) {
+  //       pageSettings.add(Text('Page Size: ${width}x$height twips'));
+  //     }
+  //   }
 
-    // Extract margins
-    final pgMar = sectPrElement.getElement('w:pgMar');
-    if (pgMar != null) {
-      final top = pgMar.getAttribute('w:top');
-      final bottom = pgMar.getAttribute('w:bottom');
-      final left = pgMar.getAttribute('w:left');
-      final right = pgMar.getAttribute('w:right');
-      pageSettings.add(Text(
-          'Margins - Top: $top, Bottom: $bottom, Left: $left, Right: $right'));
-    }
+  //   // Extract margins
+  //   final pgMar = sectPrElement.getElement('w:pgMar');
+  //   if (pgMar != null) {
+  //     final top = pgMar.getAttribute('w:top');
+  //     final bottom = pgMar.getAttribute('w:bottom');
+  //     final left = pgMar.getAttribute('w:left');
+  //     final right = pgMar.getAttribute('w:right');
+  //     pageSettings.add(Text(
+  //         'Margins - Top: $top, Bottom: $bottom, Left: $left, Right: $right'));
+  //   }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: pageSettings,
-    );
-  }
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: pageSettings,
+  //   );
+  // }
 
   static TextStyle _parseRunStyle(xml.XmlElement? styleElement) {
     if (styleElement == null) return const TextStyle();
