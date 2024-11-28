@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
@@ -6,28 +7,40 @@ import 'package:xml/xml.dart' as xml;
 import '../../docx_file_viewer.dart';
 
 class DocxExtractor {
-  DocxExtractor._();
-  static Future<List<Widget>> renderLayout(File file) async {
+  DocxExtractor();
+  Future<List<Widget>> renderLayout(File file) async {
     try {
+      Map<String, Map<int, String>> numberingMap = {};
       final archive = ZipDecoder().decodeBytes(await file.readAsBytes());
 
       // Extract document.xml and document.xml.rels
       final documentXmlFile =
           archive.files.firstWhere((file) => file.name == 'word/document.xml');
+      final numberingXmlFile = archive.files
+          .where((file) => file.name == 'word/numbering.xml')
+          .firstOrNull;
+
       final relsXmlFile = archive.files
           .firstWhere((file) => file.name == 'word/_rels/document.xml.rels');
 
       // Parse XML
       final documentXml =
           xml.XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
+
       final relsXml =
           xml.XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
+      if (numberingXmlFile != null) {
+        final numberingXmlContent =
+            utf8.decode(numberingXmlFile.content as List<int>);
+        numberingMap = parseNumberingDefinitions(numberingXmlContent);
+      }
+      // log(documentXml.toXmlString());
       // log(documentXml.toXmlString());
       // Extract image relationships
       final imageMap = _extractImageRelationships(relsXml, archive);
 
       // Parse the content
-      return _parseContent(documentXml, imageMap);
+      return _parseContent(documentXml, imageMap, numberingMap);
     } catch (e) {
       log(e.toString());
       // Handle error, log it or provide a fallback widget
@@ -38,7 +51,30 @@ class DocxExtractor {
     }
   }
 
-  static Map<String, Uint8List> _extractImageRelationships(
+  Map<String, Map<int, String>> parseNumberingDefinitions(String numberingXml) {
+    final document = xml.XmlDocument.parse(numberingXml);
+    final numberingMap = <String, Map<int, String>>{};
+
+    // Iterate through all abstractNum elements
+    for (final abstractNum in document.findAllElements('w:abstractNum')) {
+      final abstractNumId = abstractNum.getAttribute('w:abstractNumId') ?? '';
+      final levels = <int, String>{};
+
+      for (final level in abstractNum.findAllElements('w:lvl')) {
+        final ilvl = int.tryParse(level.getAttribute('w:ilvl') ?? '0') ?? 0;
+        final format =
+            level.getElement('w:numFmt')?.getAttribute('w:val') ?? '';
+
+        levels[ilvl] = format;
+      }
+
+      numberingMap[abstractNumId] = levels;
+    }
+
+    return numberingMap; // Map of abstractNumId to level definitions
+  }
+
+  Map<String, Uint8List> _extractImageRelationships(
       xml.XmlDocument relsXml, Archive archive) {
     final imageMap = <String, Uint8List>{};
 
@@ -59,27 +95,59 @@ class DocxExtractor {
     return imageMap;
   }
 
-  static Widget _parseParagraph(
-      xml.XmlElement paragraph, Map<String, Uint8List> imageMap) {
+  Widget _parseParagraph(
+      xml.XmlElement paragraph,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions) {
     final spans = <InlineSpan>[];
 
     // Handle unordered or ordered list items
     final isListItem =
         paragraph.getElement('w:pPr')?.getElement('w:numPr') != null;
-    final listLevel = _getListLevel(paragraph);
 
     if (isListItem) {
-      // Handle list item with a bullet or number
-      spans.add(TextSpan(
-        text: _getListBullet(listLevel),
-        style: const TextStyle(
-            fontSize: 16, fontWeight: FontWeight.normal, color: Colors.black),
-      ));
+      final numPr = paragraph.getElement('w:pPr')?.getElement('w:numPr');
+      final numId = numPr?.getElement('w:numId')?.getAttribute('w:val');
+      final ilvl = int.tryParse(
+            numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? '0',
+          ) ??
+          0;
+
+      if (numId != null && numberingDefinitions.containsKey(numId)) {
+        final listLevelStyle = numberingDefinitions[numId]?[ilvl];
+        int newLevel = level ?? ilvl;
+
+        if (listLevelStyle != null) {
+          if (listLevelStyle.toLowerCase() == 'bullet') {
+            level = null;
+          }
+          spans.add(WidgetSpan(
+            child: Padding(
+              padding: EdgeInsets.only(left: ilvl != 0 ? 30 : 20.0),
+              child: listLevelStyle.toLowerCase() == 'bullet'
+                  ? Text(
+                      _getBulletForLevel(ilvl),
+                      style: const TextStyle(
+                        fontSize: 20, // Adjust size based on level
+                        color: Colors.black,
+                      ),
+                    )
+                  : Text(
+                      _getFormattedListNumber(
+                          paragraph, numberingDefinitions, numId, newLevel),
+                      style: const TextStyle(color: Colors.black, fontSize: 16),
+                    ),
+            ),
+          ));
+        }
+      }
+    } else {
+      level = null;
+      enabled = false;
     }
 
     // Iterate through runs (text + style) in the paragraph
     paragraph.findAllElements('w:r').forEach((run) {
-      log(run.innerText);
       final text = run.getElement('w:t')?.innerText ?? run.innerText;
       final innerText = run.innerText;
       final style = _parseRunStyle(run.getElement('w:rPr'));
@@ -95,7 +163,18 @@ class DocxExtractor {
           style: style.copyWith(color: style.color ?? Colors.black),
         ));
       }
+      final hasPageBreak = run.getElement('w:pict');
 
+      if (hasPageBreak != null) {
+        spans.add(const WidgetSpan(
+            child: SizedBox(
+          width: double.infinity,
+          child: Divider(
+            color: Colors.grey,
+            thickness: 1,
+          ),
+        )));
+      }
       // Check for embedded images
       run.findAllElements('a:blip').forEach((imageElement) {
         final embedId = imageElement.getAttribute('r:embed') ?? '';
@@ -124,13 +203,6 @@ class DocxExtractor {
       );
     }
 
-    // Handle page breaks
-    final hasPageBreak =
-        paragraph.findElements('w:lastRenderedPageBreak').isNotEmpty;
-    if (hasPageBreak) {
-      return const SizedBox(height: 20); // Provide spacing for a page break
-    }
-
     // Handle paragraph spacing
     final paragraphSpacing = _parseParagraphSpacing(paragraph);
 
@@ -145,7 +217,7 @@ class DocxExtractor {
     );
   }
 
-  static EdgeInsets _parseParagraphSpacing(xml.XmlElement paragraph) {
+  EdgeInsets _parseParagraphSpacing(xml.XmlElement paragraph) {
     final pPr = paragraph.getElement('w:pPr');
     final before = int.tryParse(
             pPr?.getElement('w:spacing')?.getAttribute('w:before') ?? "0") ??
@@ -161,7 +233,7 @@ class DocxExtractor {
     );
   }
 
-  static TextStyle? _parseHeadingStyle(xml.XmlElement paragraph) {
+  TextStyle? _parseHeadingStyle(xml.XmlElement paragraph) {
     final pStyle = paragraph
         .getElement('w:pPr')
         ?.getElement('w:pStyle')
@@ -187,86 +259,108 @@ class DocxExtractor {
     return null; // Not a heading
   }
 
-  static Widget _parseUnorderedList(xml.XmlElement list) {
-    final listItems = <Widget>[];
+// Helper to determine the list type
 
-    list.findAllElements('w:p').forEach((item) {
-      listItems.add(Padding(
-        padding: const EdgeInsets.only(left: 20.0),
-        child: Row(
-          children: [
-            const Icon(Icons.circle, size: 6), // Bullet icon
-            const SizedBox(width: 8),
-            Expanded(child: Text(item.innerText)),
-          ],
-        ),
-      ));
-    });
-
-    return Column(children: listItems);
+// Helper to get list bullet (number or bullet symbol)
+  String _getBulletForLevel(int level) {
+    const bulletStyles = ['•', '◦', '▪', '▫', '»', '›', '⁃', '–'];
+    return bulletStyles[level % bulletStyles.length];
   }
 
-  static String _getListBullet(int level) {
-    // Customize list bullet or numbering based on the level
-    // Simple bullet for level 0, adjust for numbering as needed
-    if (level == 0) {
-      return '• '; // Bullet for level 0
+  int? level;
+  bool enabled = false;
+
+  /// Retrieves the formatted list number for an ordered list item
+  String _getFormattedListNumber(
+      xml.XmlElement paragraph,
+      Map<String, Map<int, String>> numberingDefinitions,
+      String numId,
+      int ilvl) {
+    // Retrieve the format for the current level
+    final format = numberingDefinitions[numId]?[ilvl] ?? 'decimal';
+    if (!enabled) {
+      level = _getListNumber(ilvl);
     }
-    // For other levels, return numbered list (you can customize this)
-    return '${level + 1}. ';
+
+    // Generate list number based on format
+    switch (format.toLowerCase()) {
+      case 'decimal':
+        enabled = false;
+        return '${_getListNumber(ilvl)}.'; // Example: 1., 2., 3.
+      case 'lowerroman':
+        enabled = true;
+        return '${_toRoman(_getListNumber(ilvl)).toLowerCase()}.'; // Example: i., ii., iii.
+      case 'upperroman':
+        enabled = true;
+        return '${_toRoman(_getListNumber(ilvl)).toUpperCase()}.'; // Example: I., II., III.
+      case 'lowerletter':
+        enabled = true;
+        return '${String.fromCharCode(97 + (_getListNumber(ilvl) - 1))}.'; // Example: a., b., c.
+      case 'upperletter':
+        enabled = true;
+        return '${String.fromCharCode(65 + (_getListNumber(ilvl) - 1))}.'; // Example: A., B., C.
+      default:
+        return '${_getListNumber(ilvl)}.'; // Fallback to decimal
+    }
   }
 
-  static int _getListLevel(xml.XmlElement paragraph) {
-    // Extract the list level from the paragraph
-    final numPr = paragraph.getElement('w:pPr')?.getElement('w:numPr');
-    final ilvl = num.tryParse(
-            numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? "0") ??
-        0;
-    return ilvl.toInt();
+  int _getListNumber(int ilvl) {
+    // You can use a counter or map to track the current number for each level
+    return ilvl + 1; // Simple increment logic for demo
   }
 
-  static Widget _parseOrderedList(xml.XmlElement list) {
-    final listItems = <Widget>[];
-    int counter = 1;
+  String _toRoman(int number) {
+    final romanNumerals = [
+      'M',
+      'CM',
+      'D',
+      'CD',
+      'C',
+      'XC',
+      'L',
+      'XL',
+      'X',
+      'IX',
+      'V',
+      'IV',
+      'I'
+    ];
+    final romanValues = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
+    var result = '';
+    var i = 0;
 
-    list.findAllElements('w:p').forEach((item) {
-      listItems.add(Padding(
-        padding: const EdgeInsets.only(left: 20.0),
-        child: Row(
-          children: [
-            Text('$counter. '),
-            Expanded(child: Text(item.innerText)),
-          ],
-        ),
-      ));
-      counter++;
-    });
-
-    return Column(children: listItems);
+    while (number > 0) {
+      while (number >= romanValues[i]) {
+        result += romanNumerals[i];
+        number -= romanValues[i];
+      }
+      i++;
+    }
+    return result;
   }
 
-  static List<Widget> _parseContent(
-      xml.XmlDocument documentXml, Map<String, Uint8List> imageMap) {
+  /// Retrieves the list type (ordered/unordered) based on paragraph properties
+
+  List<Widget> _parseContent(
+      xml.XmlDocument documentXml,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions) {
     final widgets = <Widget>[];
 
     for (final body in documentXml.findAllElements('w:body')) {
       for (final element in body.children.whereType<xml.XmlElement>()) {
-        log(element.name.local);
+        // log(element.name.local);
         switch (element.name.local) {
           case 'p':
-            widgets.add(_parseParagraph(element, imageMap));
+            widgets
+                .add(_parseParagraph(element, imageMap, numberingDefinitions));
             break;
           case 'tbl':
-            widgets.add(_parseTable(element, imageMap));
+            widgets.add(_parseTable(element, imageMap, numberingDefinitions));
             break;
-          case 'ul':
-            widgets.add(_parseUnorderedList(element));
-            break;
-          case 'ol':
-            widgets.add(_parseOrderedList(element));
-            break;
+
           case 'sdt':
-            widgets.add(_parseSdt(element, imageMap));
+            widgets.add(_parseSdt(element, imageMap, numberingDefinitions));
             break;
           // case 'sectPr':
           //   widgets.add(_parseSectionProperties(element));
@@ -278,8 +372,8 @@ class DocxExtractor {
     return widgets;
   }
 
-  static Widget _parseTable(
-      xml.XmlElement table, Map<String, Uint8List> imageMap) {
+  Widget _parseTable(xml.XmlElement table, Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions) {
     final rows = <TableRow>[];
 
     // Parse table border properties
@@ -299,7 +393,8 @@ class DocxExtractor {
         final backgroundColor = _parseCellBackgroundColor(cell);
 
         cell.findAllElements('w:p').forEach((paragraph) {
-          cellContent.add(_parseParagraph(paragraph, imageMap));
+          cellContent
+              .add(_parseParagraph(paragraph, imageMap, numberingDefinitions));
         });
 
         cells.add(Container(
@@ -371,8 +466,8 @@ class DocxExtractor {
     }
   }
 
-  static Widget _parseSdt(
-      xml.XmlElement sdtElement, Map<String, Uint8List> imageMap) {
+  Widget _parseSdt(xml.XmlElement sdtElement, Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions) {
     final content = sdtElement
         .findAllElements('w:sdtContent')
         .expand((contentElement) => contentElement.children)
@@ -381,9 +476,9 @@ class DocxExtractor {
     final contentWidgets = content.map((childElement) {
       switch (childElement.name.local) {
         case 'p':
-          return _parseParagraph(childElement, imageMap);
+          return _parseParagraph(childElement, imageMap, numberingDefinitions);
         case 'tbl':
-          return _parseTable(childElement, imageMap);
+          return _parseTable(childElement, imageMap, numberingDefinitions);
         default:
           return Text(childElement.innerText);
       }
