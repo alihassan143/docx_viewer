@@ -1,3 +1,7 @@
+
+## 0.0.4
+
+*  fixed order and unordered lists
 ## 0.0.3
 ### Fixed
 - Resolved an issue where the divider was not being added correctly in the widget.
