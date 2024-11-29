@@ -2,8 +2,17 @@ name: docx_file_viewer
 description:
   "A Flutter package to view DOCX files within your app. It allows users to load and display DOCX content.
   While the package tries to render documents accurately, some rendering issues may occur, especially with complex formatting."
-version: 0.0.2
-homepage: https://github.com/alihassan143/flutter_docx_viewer.git
+version: 0.0.3
+homepage: https://github.com/alihassan143/docx_viewer.git
+repository: https://github.com/alihassan143/docx_viewer.git
+issue_tracker: https://github.com/alihassan143/docx_viewer/issues
+screenshots:
+  - description: "Example of view"
+    path: example.gif
+topics:
+  - docx
+  - docxviewer
+  - word
 
 environment:
   sdk: ^3.5.4

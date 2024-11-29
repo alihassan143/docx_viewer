@@ -7,10 +7,6 @@ import 'package:xml/xml.dart' as xml;
 import '../../docx_file_viewer.dart';
 
 class DocxExtractor {
-  DocxExtractor();
-  // final Map<String, ByteData> _loadedFonts = {};
-  // final Map<String, String> _fontNameMapping = {};
-  // final Map<String, TextStyle> _styleMapping = {};
   Future<List<Widget>> renderLayout(File file) async {
     try {
       Map<String, Map<int, String>> numberingMap = {};
@@ -37,10 +33,6 @@ class DocxExtractor {
             utf8.decode(numberingXmlFile.content as List<int>);
         numberingMap = parseNumberingDefinitions(numberingXmlContent);
       }
-      // _loadFontsFromFontTable(archive);
-      // log(documentXml.toXmlString());
-      // log(documentXml.toXmlString());
-      // Extract image relationships
       final imageMap = _extractImageRelationships(relsXml, archive);
 
       // Parse the content
@@ -54,114 +46,6 @@ class DocxExtractor {
       ]; // Fallback widget in case of error
     }
   }
-
-  // Future<void> _loadStyles(xml.XmlDocument stylesXml) async {
-  //   // Parse the <w:style> elements in styles.xml and map them to TextStyle
-  //   final styles = stylesXml.findAllElements('w:style');
-
-  //   for (final style in styles) {
-  //     log(stylesXml.toXmlString());
-  //     final styleId = style.getAttribute('w:styleId');
-  //     final type = style.getAttribute('w:type');
-
-  //     // Only handle paragraph styles and character styles
-  //     if (styleId != null && (type == 'paragraph' || type == 'character')) {
-  //       final styleRun = style.getElement(
-  //           'w:rPr'); // For character styles (font, size, color, etc.)
-  //       // log(styleRun?.toXmlString() ?? '');
-  //       TextStyle textStyle = _parseStyleRun(styleRun);
-
-  //       // Store the parsed textStyle in the mapping
-  //       _styleMapping[styleId] = textStyle;
-  //     }
-  //   }
-  // }
-
-  // TextStyle _parseStyleRun(xml.XmlElement? styleRun) {
-  //   if (styleRun == null) return const TextStyle();
-
-  //   final isBold = styleRun.findElements('w:b').isNotEmpty;
-  //   final isItalic = styleRun.findElements('w:i').isNotEmpty;
-  //   final isUnderline = styleRun.findElements('w:u').isNotEmpty;
-  //   final fontSize = double.tryParse(
-  //           styleRun.getElement('w:sz')?.getAttribute('w:val') ?? '32') ??
-  //       16.0;
-  //   final colorHex =
-  //       styleRun.findElements('w:color').firstOrNull?.getAttribute('w:val');
-  //   final fontFamily = styleRun.getElement('w:rFonts')?.getAttribute('w:ascii');
-
-  //   final textColor = colorHex != null ? _hexToColor(colorHex) : Colors.black;
-  //   final effectiveFontFamily = fontFamily ?? 'Roboto';
-  //   String? bgHex;
-  //   final highlightElement = styleRun.getElement('w:highlight');
-  //   final shadingElement = styleRun.getElement('w:shd');
-
-  //   if (highlightElement != null) {
-  //     bgHex = highlightElement.getAttribute('w:val');
-  //   } else if (shadingElement != null) {
-  //     bgHex = shadingElement.getAttribute('w:fill');
-  //   }
-  //   final backgroundColor = bgHex != null && bgHex != 'auto'
-  //       ? _hexToColor(bgHex)
-  //       : Colors.transparent;
-
-  //   return TextStyle(
-  //     fontFamily: effectiveFontFamily,
-  //     backgroundColor: backgroundColor,
-  //     fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-  //     fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-  //     decoration: isUnderline ? TextDecoration.underline : TextDecoration.none,
-  //     fontSize: fontSize / 2, // Word font size is in half-points
-  //     color: textColor, // Set the effective text color
-  //   );
-  // }
-
-  // Future<void> _loadFontsFromFontTable(Archive archive) async {
-  //   final fontTableRelsFile = archive.files
-  //       .where(
-  //         (file) => file.name == 'word/_rels/fontTable.xml.rels',
-  //       )
-  //       .firstOrNull;
-  //   if (fontTableRelsFile != null) {
-  //     final fontTableRelsXml = xml.XmlDocument.parse(
-  //         String.fromCharCodes(fontTableRelsFile.content));
-  //     // log(fontTableRelsXml.toXmlString());
-  //     // Extract font relationships from the fontTable.xml.rels file
-  //     fontTableRelsXml.findAllElements('Relationship').forEach((rel) {
-  //       final type = rel.getAttribute('Type') ?? '';
-  //       final target = rel.getAttribute('Target') ?? '';
-  //       final id = rel.getAttribute('Id') ?? '';
-
-  //       // Check if it's a font resource
-  //       if (type.contains('font')) {
-  //         final fontPath = 'word/$target';
-
-  //         final fontFile = archive.files
-  //             .where(
-  //               (file) => file.name == fontPath,
-  //             )
-  //             .firstOrNull;
-  //         if (fontFile != null) {
-  //           final fontData =
-  //               ByteData.sublistView(Uint8List.fromList(fontFile.content));
-  //           _loadedFonts[id] = fontData;
-  //           log(id);
-  //           final fontFamily =
-  //               'customFont$id'; // Or use some logic to extract font family name
-  //           _fontNameMapping[id] = fontFamily;
-  //           // Load the font using Flutter's FontLoader
-  //           final fontLoader = FontLoader(id)..addFont(loadFont(fontData));
-  //           fontLoader.load();
-  //         }
-  //       }
-  //     });
-  //   }
-  // }
-
-  // Future<ByteData> loadFont(ByteData data) async {
-  //   await Future.delayed(Duration.zero, () {});
-  //   return data;
-  // }
 
   Map<String, Map<int, String>> parseNumberingDefinitions(String numberingXml) {
     final document = xml.XmlDocument.parse(numberingXml);
@@ -417,11 +301,6 @@ class DocxExtractor {
     }
   }
 
-  int _getListNumber(int ilvl) {
-    // You can use a counter or map to track the current number for each level
-    return ilvl + 1; // Simple increment logic for demo
-  }
-
   String _toRoman(int number) {
     final romanNumerals = [
       'M',
@@ -613,44 +492,9 @@ class DocxExtractor {
     );
   }
 
-  // static Widget _parseSectionProperties(xml.XmlElement sectPrElement) {
-  //   final pageSettings = <Widget>[];
-
-  //   // Extract page size
-  //   final pgSz = sectPrElement.getElement('w:pgSz');
-  //   if (pgSz != null) {
-  //     final width = pgSz.getAttribute('w:w');
-  //     final height = pgSz.getAttribute('w:h');
-  //     if (width != null && height != null) {
-  //       pageSettings.add(Text('Page Size: ${width}x$height twips'));
-  //     }
-  //   }
-
-  //   // Extract margins
-  //   final pgMar = sectPrElement.getElement('w:pgMar');
-  //   if (pgMar != null) {
-  //     final top = pgMar.getAttribute('w:top');
-  //     final bottom = pgMar.getAttribute('w:bottom');
-  //     final left = pgMar.getAttribute('w:left');
-  //     final right = pgMar.getAttribute('w:right');
-  //     pageSettings.add(Text(
-  //         'Margins - Top: $top, Bottom: $bottom, Left: $left, Right: $right'));
-  //   }
-
-  //   return Column(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: pageSettings,
-  //   );
-  // }
   TextStyle _parseRunStyle(xml.XmlElement? styleElement) {
     if (styleElement == null) return const TextStyle();
 
-    // final styleId = styleElement.getAttribute('w:styleId');
-    // log("style id $styleId");
-    // if (_styleMapping[styleId ?? ''] != null) {
-    //   return _styleMapping[styleId ?? '']!;
-    // }
-    // Check for basic style properties (bold, italic, underline)
     final isBold = styleElement.findElements('w:b').isNotEmpty;
     final isItalic = styleElement.findElements('w:i').isNotEmpty;
     final isUnderline = styleElement.findElements('w:u').isNotEmpty;
@@ -684,11 +528,6 @@ class DocxExtractor {
         ? _hexToColor(bgHex)
         : Colors.transparent;
 
-    // If custom font is available, load it
-    // final fontId = styleElement.getElement('w:rFonts')?.getAttribute('w:ascii');
-
-    // final fontFamily = _fontNameMapping[fontId ?? ''] ?? 'Roboto';
-    // log(fontFamily);
     return TextStyle(
       // fontFamily: fontFamily,
       fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
