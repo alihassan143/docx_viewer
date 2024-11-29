@@ -16,7 +16,7 @@ class _DocxViewerState extends State<DocxViewer> {
   @override
   void initState() {
     super.initState();
-    loadDocumet = DocxExtractor.renderLayout(widget.file);
+    loadDocumet = DocxExtractor().renderLayout(widget.file);
   }
 
   @override
