@@ -6,6 +6,9 @@ version: 0.0.3
 homepage: https://github.com/alihassan143/docx_viewer.git
 repository: https://github.com/alihassan143/docx_viewer.git
 issue_tracker: https://github.com/alihassan143/docx_viewer/issues
+screenshots:
+  - description: "Example of view"
+    path: example.gif
 topics:
   - docx
   - docxviewer
