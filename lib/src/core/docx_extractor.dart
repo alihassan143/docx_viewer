@@ -8,6 +8,9 @@ import '../../docx_file_viewer.dart';
 
 class DocxExtractor {
   DocxExtractor();
+  // final Map<String, ByteData> _loadedFonts = {};
+  // final Map<String, String> _fontNameMapping = {};
+  // final Map<String, TextStyle> _styleMapping = {};
   Future<List<Widget>> renderLayout(File file) async {
     try {
       Map<String, Map<int, String>> numberingMap = {};
@@ -26,7 +29,7 @@ class DocxExtractor {
       // Parse XML
       final documentXml =
           xml.XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
-
+      log(documentXml.toXmlString());
       final relsXml =
           xml.XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
       if (numberingXmlFile != null) {
@@ -34,6 +37,7 @@ class DocxExtractor {
             utf8.decode(numberingXmlFile.content as List<int>);
         numberingMap = parseNumberingDefinitions(numberingXmlContent);
       }
+      // _loadFontsFromFontTable(archive);
       // log(documentXml.toXmlString());
       // log(documentXml.toXmlString());
       // Extract image relationships
@@ -50,6 +54,114 @@ class DocxExtractor {
       ]; // Fallback widget in case of error
     }
   }
+
+  // Future<void> _loadStyles(xml.XmlDocument stylesXml) async {
+  //   // Parse the <w:style> elements in styles.xml and map them to TextStyle
+  //   final styles = stylesXml.findAllElements('w:style');
+
+  //   for (final style in styles) {
+  //     log(stylesXml.toXmlString());
+  //     final styleId = style.getAttribute('w:styleId');
+  //     final type = style.getAttribute('w:type');
+
+  //     // Only handle paragraph styles and character styles
+  //     if (styleId != null && (type == 'paragraph' || type == 'character')) {
+  //       final styleRun = style.getElement(
+  //           'w:rPr'); // For character styles (font, size, color, etc.)
+  //       // log(styleRun?.toXmlString() ?? '');
+  //       TextStyle textStyle = _parseStyleRun(styleRun);
+
+  //       // Store the parsed textStyle in the mapping
+  //       _styleMapping[styleId] = textStyle;
+  //     }
+  //   }
+  // }
+
+  // TextStyle _parseStyleRun(xml.XmlElement? styleRun) {
+  //   if (styleRun == null) return const TextStyle();
+
+  //   final isBold = styleRun.findElements('w:b').isNotEmpty;
+  //   final isItalic = styleRun.findElements('w:i').isNotEmpty;
+  //   final isUnderline = styleRun.findElements('w:u').isNotEmpty;
+  //   final fontSize = double.tryParse(
+  //           styleRun.getElement('w:sz')?.getAttribute('w:val') ?? '32') ??
+  //       16.0;
+  //   final colorHex =
+  //       styleRun.findElements('w:color').firstOrNull?.getAttribute('w:val');
+  //   final fontFamily = styleRun.getElement('w:rFonts')?.getAttribute('w:ascii');
+
+  //   final textColor = colorHex != null ? _hexToColor(colorHex) : Colors.black;
+  //   final effectiveFontFamily = fontFamily ?? 'Roboto';
+  //   String? bgHex;
+  //   final highlightElement = styleRun.getElement('w:highlight');
+  //   final shadingElement = styleRun.getElement('w:shd');
+
+  //   if (highlightElement != null) {
+  //     bgHex = highlightElement.getAttribute('w:val');
+  //   } else if (shadingElement != null) {
+  //     bgHex = shadingElement.getAttribute('w:fill');
+  //   }
+  //   final backgroundColor = bgHex != null && bgHex != 'auto'
+  //       ? _hexToColor(bgHex)
+  //       : Colors.transparent;
+
+  //   return TextStyle(
+  //     fontFamily: effectiveFontFamily,
+  //     backgroundColor: backgroundColor,
+  //     fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+  //     fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+  //     decoration: isUnderline ? TextDecoration.underline : TextDecoration.none,
+  //     fontSize: fontSize / 2, // Word font size is in half-points
+  //     color: textColor, // Set the effective text color
+  //   );
+  // }
+
+  // Future<void> _loadFontsFromFontTable(Archive archive) async {
+  //   final fontTableRelsFile = archive.files
+  //       .where(
+  //         (file) => file.name == 'word/_rels/fontTable.xml.rels',
+  //       )
+  //       .firstOrNull;
+  //   if (fontTableRelsFile != null) {
+  //     final fontTableRelsXml = xml.XmlDocument.parse(
+  //         String.fromCharCodes(fontTableRelsFile.content));
+  //     // log(fontTableRelsXml.toXmlString());
+  //     // Extract font relationships from the fontTable.xml.rels file
+  //     fontTableRelsXml.findAllElements('Relationship').forEach((rel) {
+  //       final type = rel.getAttribute('Type') ?? '';
+  //       final target = rel.getAttribute('Target') ?? '';
+  //       final id = rel.getAttribute('Id') ?? '';
+
+  //       // Check if it's a font resource
+  //       if (type.contains('font')) {
+  //         final fontPath = 'word/$target';
+
+  //         final fontFile = archive.files
+  //             .where(
+  //               (file) => file.name == fontPath,
+  //             )
+  //             .firstOrNull;
+  //         if (fontFile != null) {
+  //           final fontData =
+  //               ByteData.sublistView(Uint8List.fromList(fontFile.content));
+  //           _loadedFonts[id] = fontData;
+  //           log(id);
+  //           final fontFamily =
+  //               'customFont$id'; // Or use some logic to extract font family name
+  //           _fontNameMapping[id] = fontFamily;
+  //           // Load the font using Flutter's FontLoader
+  //           final fontLoader = FontLoader(id)..addFont(loadFont(fontData));
+  //           fontLoader.load();
+  //         }
+  //       }
+  //     });
+  //   }
+  // }
+
+  // Future<ByteData> loadFont(ByteData data) async {
+  //   await Future.delayed(Duration.zero, () {});
+  //   return data;
+  // }
 
   Map<String, Map<int, String>> parseNumberingDefinitions(String numberingXml) {
     final document = xml.XmlDocument.parse(numberingXml);
@@ -98,7 +210,8 @@ class DocxExtractor {
   Widget _parseParagraph(
       xml.XmlElement paragraph,
       Map<String, Uint8List> imageMap,
-      Map<String, Map<int, String>> numberingDefinitions) {
+      Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counter) {
     final spans = <InlineSpan>[];
 
     // Handle unordered or ordered list items
@@ -134,7 +247,7 @@ class DocxExtractor {
                     )
                   : Text(
                       _getFormattedListNumber(
-                          paragraph, numberingDefinitions, numId, newLevel),
+                          numberingDefinitions, counter, numId, newLevel),
                       style: const TextStyle(color: Colors.black, fontSize: 16),
                     ),
             ),
@@ -238,25 +351,28 @@ class DocxExtractor {
         .getElement('w:pPr')
         ?.getElement('w:pStyle')
         ?.getAttribute('w:val');
+    TextStyle style = _parseRunStyle(paragraph.getElement('w:rPr'));
+
     if (pStyle != null) {
       switch (pStyle) {
         case 'Heading1':
-          return const TextStyle(fontSize: 32, fontWeight: FontWeight.bold);
+          style = style.copyWith(fontSize: 32, fontWeight: FontWeight.bold);
         case 'Heading2':
-          return const TextStyle(fontSize: 28, fontWeight: FontWeight.bold);
+          style = style.copyWith(fontSize: 28, fontWeight: FontWeight.bold);
         case 'Heading3':
-          return const TextStyle(fontSize: 24, fontWeight: FontWeight.bold);
+          style = style.copyWith(fontSize: 24, fontWeight: FontWeight.bold);
         case 'Heading4':
-          return const TextStyle(fontSize: 20, fontWeight: FontWeight.bold);
+          style = style.copyWith(fontSize: 20, fontWeight: FontWeight.bold);
         case 'Heading5':
-          return const TextStyle(fontSize: 18, fontWeight: FontWeight.bold);
+          style = style.copyWith(fontSize: 18, fontWeight: FontWeight.bold);
         case 'Heading6':
-          return const TextStyle(fontSize: 16, fontWeight: FontWeight.bold);
+          style = style.copyWith(fontSize: 16, fontWeight: FontWeight.bold);
         default:
-          return null; // Default to body text if not a heading
+          break;
       }
     }
-    return null; // Not a heading
+
+    return style; // Not a heading
   }
 
 // Helper to determine the list type
@@ -272,35 +388,32 @@ class DocxExtractor {
 
   /// Retrieves the formatted list number for an ordered list item
   String _getFormattedListNumber(
-      xml.XmlElement paragraph,
       Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counters,
       String numId,
       int ilvl) {
     // Retrieve the format for the current level
     final format = numberingDefinitions[numId]?[ilvl] ?? 'decimal';
-    if (!enabled) {
-      level = _getListNumber(ilvl);
-    }
+
+    // Increment the counter for the given numId and ilvl
+    final key = '$numId-$ilvl';
+    counters[key] = (counters[key] ?? 0) + 1;
+    final number = counters[key]!;
 
     // Generate list number based on format
     switch (format.toLowerCase()) {
       case 'decimal':
-        enabled = false;
-        return '${_getListNumber(ilvl)}.'; // Example: 1., 2., 3.
+        return '$number.'; // Example: 1., 2., 3.
       case 'lowerroman':
-        enabled = true;
-        return '${_toRoman(_getListNumber(ilvl)).toLowerCase()}.'; // Example: i., ii., iii.
+        return '${_toRoman(number).toLowerCase()}.'; // Example: i., ii., iii.
       case 'upperroman':
-        enabled = true;
-        return '${_toRoman(_getListNumber(ilvl)).toUpperCase()}.'; // Example: I., II., III.
+        return '${_toRoman(number).toUpperCase()}.'; // Example: I., II., III.
       case 'lowerletter':
-        enabled = true;
-        return '${String.fromCharCode(97 + (_getListNumber(ilvl) - 1))}.'; // Example: a., b., c.
+        return '${String.fromCharCode(97 + (number - 1))}.'; // Example: a., b., c.
       case 'upperletter':
-        enabled = true;
-        return '${String.fromCharCode(65 + (_getListNumber(ilvl) - 1))}.'; // Example: A., B., C.
+        return '${String.fromCharCode(65 + (number - 1))}.'; // Example: A., B., C.
       default:
-        return '${_getListNumber(ilvl)}.'; // Fallback to decimal
+        return '$number.'; // Fallback to decimal
     }
   }
 
@@ -346,21 +459,23 @@ class DocxExtractor {
       Map<String, Uint8List> imageMap,
       Map<String, Map<int, String>> numberingDefinitions) {
     final widgets = <Widget>[];
-
+    final counters = <String, int>{};
     for (final body in documentXml.findAllElements('w:body')) {
       for (final element in body.children.whereType<xml.XmlElement>()) {
         // log(element.name.local);
         switch (element.name.local) {
           case 'p':
-            widgets
-                .add(_parseParagraph(element, imageMap, numberingDefinitions));
+            widgets.add(_parseParagraph(
+                element, imageMap, numberingDefinitions, counters));
             break;
           case 'tbl':
-            widgets.add(_parseTable(element, imageMap, numberingDefinitions));
+            widgets.add(
+                _parseTable(element, imageMap, numberingDefinitions, counters));
             break;
 
           case 'sdt':
-            widgets.add(_parseSdt(element, imageMap, numberingDefinitions));
+            widgets.add(
+                _parseSdt(element, imageMap, numberingDefinitions, counters));
             break;
           // case 'sectPr':
           //   widgets.add(_parseSectionProperties(element));
@@ -372,8 +487,11 @@ class DocxExtractor {
     return widgets;
   }
 
-  Widget _parseTable(xml.XmlElement table, Map<String, Uint8List> imageMap,
-      Map<String, Map<int, String>> numberingDefinitions) {
+  Widget _parseTable(
+      xml.XmlElement table,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counter) {
     final rows = <TableRow>[];
 
     // Parse table border properties
@@ -393,8 +511,8 @@ class DocxExtractor {
         final backgroundColor = _parseCellBackgroundColor(cell);
 
         cell.findAllElements('w:p').forEach((paragraph) {
-          cellContent
-              .add(_parseParagraph(paragraph, imageMap, numberingDefinitions));
+          cellContent.add(_parseParagraph(
+              paragraph, imageMap, numberingDefinitions, counter));
         });
 
         cells.add(Container(
@@ -436,7 +554,7 @@ class DocxExtractor {
   }
 
   // Parse table border style (color, width)
-  static TableBorderStyle _parseTableBorderStyle(xml.XmlElement table) {
+  TableBorderStyle _parseTableBorderStyle(xml.XmlElement table) {
     final borderColor = table
             .getElement('w:tblBorders')
             ?.getElement('w:top')
@@ -455,7 +573,7 @@ class DocxExtractor {
   }
 
   // Parse background color (shading) for a table cell
-  static Color _parseCellBackgroundColor(xml.XmlElement cell) {
+  Color _parseCellBackgroundColor(xml.XmlElement cell) {
     final shading = cell.getElement('w:shd');
     final fillColor = shading?.getAttribute('w:fill');
 
@@ -466,8 +584,11 @@ class DocxExtractor {
     }
   }
 
-  Widget _parseSdt(xml.XmlElement sdtElement, Map<String, Uint8List> imageMap,
-      Map<String, Map<int, String>> numberingDefinitions) {
+  Widget _parseSdt(
+      xml.XmlElement sdtElement,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counter) {
     final content = sdtElement
         .findAllElements('w:sdtContent')
         .expand((contentElement) => contentElement.children)
@@ -476,9 +597,11 @@ class DocxExtractor {
     final contentWidgets = content.map((childElement) {
       switch (childElement.name.local) {
         case 'p':
-          return _parseParagraph(childElement, imageMap, numberingDefinitions);
+          return _parseParagraph(
+              childElement, imageMap, numberingDefinitions, counter);
         case 'tbl':
-          return _parseTable(childElement, imageMap, numberingDefinitions);
+          return _parseTable(
+              childElement, imageMap, numberingDefinitions, counter);
         default:
           return Text(childElement.innerText);
       }
@@ -519,10 +642,14 @@ class DocxExtractor {
   //     children: pageSettings,
   //   );
   // }
-
-  static TextStyle _parseRunStyle(xml.XmlElement? styleElement) {
+  TextStyle _parseRunStyle(xml.XmlElement? styleElement) {
     if (styleElement == null) return const TextStyle();
 
+    // final styleId = styleElement.getAttribute('w:styleId');
+    // log("style id $styleId");
+    // if (_styleMapping[styleId ?? ''] != null) {
+    //   return _styleMapping[styleId ?? '']!;
+    // }
     // Check for basic style properties (bold, italic, underline)
     final isBold = styleElement.findElements('w:b').isNotEmpty;
     final isItalic = styleElement.findElements('w:i').isNotEmpty;
@@ -530,7 +657,7 @@ class DocxExtractor {
 
     // Parse font size (half-points to points)
     final fontSize = double.tryParse(
-          styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '32',
+          styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '20',
         ) ??
         16.0;
     // Parse text color (if available)
@@ -543,12 +670,27 @@ class DocxExtractor {
         textColor == Colors.transparent ? Colors.black : textColor;
 
     // Parse background color (shading) for text background
-    final shadingElement = styleElement.findElements('w:shd').firstOrNull;
-    final backgroundColor = shadingElement?.getAttribute('w:fill') != null
-        ? _hexToColor(shadingElement!.getAttribute('w:fill')!)
+
+    String? bgHex;
+    final highlightElement = styleElement.getElement('w:highlight');
+    final shadingElement = styleElement.getElement('w:shd');
+
+    if (highlightElement != null) {
+      bgHex = highlightElement.getAttribute('w:val');
+    } else if (shadingElement != null) {
+      bgHex = shadingElement.getAttribute('w:fill');
+    }
+    final backgroundColor = bgHex != null && bgHex != 'auto'
+        ? _hexToColor(bgHex)
         : Colors.transparent;
 
+    // If custom font is available, load it
+    // final fontId = styleElement.getElement('w:rFonts')?.getAttribute('w:ascii');
+
+    // final fontFamily = _fontNameMapping[fontId ?? ''] ?? 'Roboto';
+    // log(fontFamily);
     return TextStyle(
+      // fontFamily: fontFamily,
       fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
       fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
       decoration: isUnderline ? TextDecoration.underline : TextDecoration.none,
@@ -558,30 +700,56 @@ class DocxExtractor {
     );
   }
 
-  static Color _hexToColor(String hex) {
-    // Clean up the hex string by removing any '#' and converting it to uppercase
-    final hexColor = hex.replaceAll('#', '').toUpperCase();
+  Color _hexToColor(String hex) {
+    try {
+      // Clean up the hex string by removing any '#' and converting it to uppercase
+      final hexColor = hex.replaceAll('#', '').toUpperCase();
 
-    // If the hex code is 6 characters long (RGB), make it 8 by adding full opacity (FF)
-    if (hexColor.length == 6) {
-      return Color(int.parse('0xFF$hexColor'));
-    }
-
-    // If the hex code is 8 characters long (RGBA), use it directly
-    if (hexColor.length == 8) {
-      // Extract the alpha value (first 2 characters)
-      final alpha = int.parse(hexColor.substring(0, 2), radix: 16);
-
-      // If the alpha value is 0 (fully transparent), return black color
-      if (alpha == 0) {
-        return Colors.black; // Fallback to black
+      // If the hex code is 6 characters long (RGB), make it 8 by adding full opacity (FF)
+      if (hexColor.length == 6) {
+        return Color(int.parse('0xFF$hexColor'));
       }
 
-      return Color(int.parse('0x$hexColor'));
-    }
+      // If the hex code is 8 characters long (RGBA), use it directly
+      if (hexColor.length == 8) {
+        // Extract the alpha value (first 2 characters)
+        final alpha = int.parse(hexColor.substring(0, 2), radix: 16);
 
-    // Fallback for unexpected formats (return black in case of an invalid format)
-    return Colors.black;
+        // If the alpha value is 0 (fully transparent), return black color
+        if (alpha == 0) {
+          return Colors.black; // Fallback to black
+        }
+
+        return Color(int.parse('0x$hexColor'));
+      }
+
+      // Fallback for unexpected formats (return black in case of an invalid format)
+      return Colors.black;
+    } catch (e) {
+      log(hex);
+      return getColorFromString(hex);
+    }
+  }
+
+  Color getColorFromString(String colorName) {
+    // Define a map of supported colors
+    Map<String, Color> colorMap = {
+      'yellow': Colors.yellow,
+      'red': Colors.red,
+      'blue': Colors.blue,
+      'green': Colors.green,
+      'black': Colors.black,
+      'white': Colors.white,
+      'orange': Colors.orange,
+      'purple': Colors.purple,
+      'pink': Colors.pink,
+      'brown': Colors.brown,
+      'cyan': Colors.cyan,
+      'grey': Colors.grey,
+    };
+
+    // Return the color if found, else default to transparent
+    return colorMap[colorName.toLowerCase()] ?? Colors.transparent;
   }
 }
 

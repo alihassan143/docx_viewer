@@ -26,7 +26,8 @@ class _DocxViewerState extends State<DocxViewer> {
         future: loadDocumet,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
-            return ListView(children: snapshot.requireData);
+            return InteractiveViewer(
+                child: ListView(children: snapshot.requireData));
           } else if (snapshot.hasError) {
             return const Center(
               child: Text("Error rendering layout"),
