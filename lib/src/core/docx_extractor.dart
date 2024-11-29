@@ -66,44 +66,44 @@ class DocxExtractor {
   //   }
   // }
 
-  TextStyle _parseStyleRun(xml.XmlElement? styleRun) {
-    if (styleRun == null) return const TextStyle();
+  // TextStyle _parseStyleRun(xml.XmlElement? styleRun) {
+  //   if (styleRun == null) return const TextStyle();
 
-    final isBold = styleRun.findElements('w:b').isNotEmpty;
-    final isItalic = styleRun.findElements('w:i').isNotEmpty;
-    final isUnderline = styleRun.findElements('w:u').isNotEmpty;
-    final fontSize = double.tryParse(
-            styleRun.getElement('w:sz')?.getAttribute('w:val') ?? '32') ??
-        16.0;
-    final colorHex =
-        styleRun.findElements('w:color').firstOrNull?.getAttribute('w:val');
-    final fontFamily = styleRun.getElement('w:rFonts')?.getAttribute('w:ascii');
+  //   final isBold = styleRun.findElements('w:b').isNotEmpty;
+  //   final isItalic = styleRun.findElements('w:i').isNotEmpty;
+  //   final isUnderline = styleRun.findElements('w:u').isNotEmpty;
+  //   final fontSize = double.tryParse(
+  //           styleRun.getElement('w:sz')?.getAttribute('w:val') ?? '32') ??
+  //       16.0;
+  //   final colorHex =
+  //       styleRun.findElements('w:color').firstOrNull?.getAttribute('w:val');
+  //   final fontFamily = styleRun.getElement('w:rFonts')?.getAttribute('w:ascii');
 
-    final textColor = colorHex != null ? _hexToColor(colorHex) : Colors.black;
-    final effectiveFontFamily = fontFamily ?? 'Roboto';
-    String? bgHex;
-    final highlightElement = styleRun.getElement('w:highlight');
-    final shadingElement = styleRun.getElement('w:shd');
+  //   final textColor = colorHex != null ? _hexToColor(colorHex) : Colors.black;
+  //   final effectiveFontFamily = fontFamily ?? 'Roboto';
+  //   String? bgHex;
+  //   final highlightElement = styleRun.getElement('w:highlight');
+  //   final shadingElement = styleRun.getElement('w:shd');
 
-    if (highlightElement != null) {
-      bgHex = highlightElement.getAttribute('w:val');
-    } else if (shadingElement != null) {
-      bgHex = shadingElement.getAttribute('w:fill');
-    }
-    final backgroundColor = bgHex != null && bgHex != 'auto'
-        ? _hexToColor(bgHex)
-        : Colors.transparent;
+  //   if (highlightElement != null) {
+  //     bgHex = highlightElement.getAttribute('w:val');
+  //   } else if (shadingElement != null) {
+  //     bgHex = shadingElement.getAttribute('w:fill');
+  //   }
+  //   final backgroundColor = bgHex != null && bgHex != 'auto'
+  //       ? _hexToColor(bgHex)
+  //       : Colors.transparent;
 
-    return TextStyle(
-      fontFamily: effectiveFontFamily,
-      backgroundColor: backgroundColor,
-      fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-      fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-      decoration: isUnderline ? TextDecoration.underline : TextDecoration.none,
-      fontSize: fontSize / 2, // Word font size is in half-points
-      color: textColor, // Set the effective text color
-    );
-  }
+  //   return TextStyle(
+  //     fontFamily: effectiveFontFamily,
+  //     backgroundColor: backgroundColor,
+  //     fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+  //     fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+  //     decoration: isUnderline ? TextDecoration.underline : TextDecoration.none,
+  //     fontSize: fontSize / 2, // Word font size is in half-points
+  //     color: textColor, // Set the effective text color
+  //   );
+  // }
 
   // Future<void> _loadFontsFromFontTable(Archive archive) async {
   //   final fontTableRelsFile = archive.files
