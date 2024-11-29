@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
@@ -6,16 +7,18 @@ import 'package:xml/xml.dart' as xml;
 import '../../docx_file_viewer.dart';
 
 class DocxExtractor {
-  // final Map<String, ByteData> _loadedFonts = {};
-  // final Map<String, String> _fontNameMapping = {};
-  // final Map<String, TextStyle> _styleMapping = {};
   Future<List<Widget>> renderLayout(File file) async {
     try {
+      Map<String, Map<int, String>> numberingMap = {};
       final archive = ZipDecoder().decodeBytes(await file.readAsBytes());
 
       // Extract document.xml and document.xml.rels
       final documentXmlFile =
           archive.files.firstWhere((file) => file.name == 'word/document.xml');
+      final numberingXmlFile = archive.files
+          .where((file) => file.name == 'word/numbering.xml')
+          .firstOrNull;
+
       final relsXmlFile = archive.files
           .firstWhere((file) => file.name == 'word/_rels/document.xml.rels');
       // final stylesXmlFile =
@@ -23,17 +26,19 @@ class DocxExtractor {
       // Parse XML
       final documentXml =
           xml.XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
+      log(documentXml.toXmlString());
       final relsXml =
           xml.XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
-      // final stylesXml =
-      //     xml.XmlDocument.parse(String.fromCharCodes(stylesXmlFile.content));
-      // log(documentXml.toXmlString());
-      // Extract image relationships
+      if (numberingXmlFile != null) {
+        final numberingXmlContent =
+            utf8.decode(numberingXmlFile.content as List<int>);
+        numberingMap = parseNumberingDefinitions(numberingXmlContent);
+      }
       final imageMap = _extractImageRelationships(relsXml, archive);
       // await _loadFontsFromFontTable(archive);
       // await _loadStyles(stylesXml);
       // Parse the content
-      return _parseContent(documentXml, imageMap);
+      return _parseContent(documentXml, imageMap, numberingMap);
     } catch (e) {
       log(e.toString());
       // Handle error, log it or provide a fallback widget
@@ -44,112 +49,27 @@ class DocxExtractor {
     }
   }
 
-  // Future<void> _loadStyles(xml.XmlDocument stylesXml) async {
-  //   // Parse the <w:style> elements in styles.xml and map them to TextStyle
-  //   final styles = stylesXml.findAllElements('w:style');
+  Map<String, Map<int, String>> parseNumberingDefinitions(String numberingXml) {
+    final document = xml.XmlDocument.parse(numberingXml);
+    final numberingMap = <String, Map<int, String>>{};
 
-  //   for (final style in styles) {
-  //     log(stylesXml.toXmlString());
-  //     final styleId = style.getAttribute('w:styleId');
-  //     final type = style.getAttribute('w:type');
+    // Iterate through all abstractNum elements
+    for (final abstractNum in document.findAllElements('w:abstractNum')) {
+      final abstractNumId = abstractNum.getAttribute('w:abstractNumId') ?? '';
+      final levels = <int, String>{};
 
-  //     // Only handle paragraph styles and character styles
-  //     if (styleId != null && (type == 'paragraph' || type == 'character')) {
-  //       final styleRun = style.getElement(
-  //           'w:rPr'); // For character styles (font, size, color, etc.)
-  //       // log(styleRun?.toXmlString() ?? '');
-  //       TextStyle textStyle = _parseStyleRun(styleRun);
+      for (final level in abstractNum.findAllElements('w:lvl')) {
+        final ilvl = int.tryParse(level.getAttribute('w:ilvl') ?? '0') ?? 0;
+        final format =
+            level.getElement('w:numFmt')?.getAttribute('w:val') ?? '';
 
-  //       // Store the parsed textStyle in the mapping
-  //       _styleMapping[styleId] = textStyle;
-  //     }
-  //   }
-  // }
+        levels[ilvl] = format;
+      }
 
-  // TextStyle _parseStyleRun(xml.XmlElement? styleRun) {
-  //   if (styleRun == null) return const TextStyle();
+      numberingMap[abstractNumId] = levels;
+    }
 
-  //   final isBold = styleRun.findElements('w:b').isNotEmpty;
-  //   final isItalic = styleRun.findElements('w:i').isNotEmpty;
-  //   final isUnderline = styleRun.findElements('w:u').isNotEmpty;
-  //   final fontSize = double.tryParse(
-  //           styleRun.getElement('w:sz')?.getAttribute('w:val') ?? '32') ??
-  //       16.0;
-  //   final colorHex =
-  //       styleRun.findElements('w:color').firstOrNull?.getAttribute('w:val');
-  //   final fontFamily = styleRun.getElement('w:rFonts')?.getAttribute('w:ascii');
-
-  //   final textColor = colorHex != null ? _hexToColor(colorHex) : Colors.black;
-  //   final effectiveFontFamily = fontFamily ?? 'Roboto';
-  //   String? bgHex;
-  //   final highlightElement = styleRun.getElement('w:highlight');
-  //   final shadingElement = styleRun.getElement('w:shd');
-
-  //   if (highlightElement != null) {
-  //     bgHex = highlightElement.getAttribute('w:val');
-  //   } else if (shadingElement != null) {
-  //     bgHex = shadingElement.getAttribute('w:fill');
-  //   }
-  //   final backgroundColor = bgHex != null && bgHex != 'auto'
-  //       ? _hexToColor(bgHex)
-  //       : Colors.transparent;
-
-  //   return TextStyle(
-  //     fontFamily: effectiveFontFamily,
-  //     backgroundColor: backgroundColor,
-  //     fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-  //     fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
-  //     decoration: isUnderline ? TextDecoration.underline : TextDecoration.none,
-  //     fontSize: fontSize / 2, // Word font size is in half-points
-  //     color: textColor, // Set the effective text color
-  //   );
-  // }
-
-  // Future<void> _loadFontsFromFontTable(Archive archive) async {
-  //   final fontTableRelsFile = archive.files
-  //       .where(
-  //         (file) => file.name == 'word/_rels/fontTable.xml.rels',
-  //       )
-  //       .firstOrNull;
-  //   if (fontTableRelsFile != null) {
-  //     final fontTableRelsXml = xml.XmlDocument.parse(
-  //         String.fromCharCodes(fontTableRelsFile.content));
-  //     // log(fontTableRelsXml.toXmlString());
-  //     // Extract font relationships from the fontTable.xml.rels file
-  //     fontTableRelsXml.findAllElements('Relationship').forEach((rel) {
-  //       final type = rel.getAttribute('Type') ?? '';
-  //       final target = rel.getAttribute('Target') ?? '';
-  //       final id = rel.getAttribute('Id') ?? '';
-
-  //       // Check if it's a font resource
-  //       if (type.contains('font')) {
-  //         final fontPath = 'word/$target';
-
-  //         final fontFile = archive.files
-  //             .where(
-  //               (file) => file.name == fontPath,
-  //             )
-  //             .firstOrNull;
-  //         if (fontFile != null) {
-  //           final fontData =
-  //               ByteData.sublistView(Uint8List.fromList(fontFile.content));
-  //           _loadedFonts[id] = fontData;
-
-  //           final fontFamily =
-  //               'customFont$id'; // Or use some logic to extract font family name
-  //           _fontNameMapping[id] = fontFamily;
-  //           // Load the font using Flutter's FontLoader
-  //           final fontLoader = FontLoader(id)..addFont(loadFont(fontData));
-  //           fontLoader.load();
-  //         }
-  //       }
-  //     });
-  //   }
-  // }
-
-  Future<ByteData> loadFont(ByteData data) async {
-    await Future.delayed(Duration.zero, () {});
-    return data;
+    return numberingMap; // Map of abstractNumId to level definitions
   }
 
   Map<String, Uint8List> _extractImageRelationships(
@@ -174,25 +94,55 @@ class DocxExtractor {
   }
 
   Widget _parseParagraph(
-      xml.XmlElement paragraph, Map<String, Uint8List> imageMap) {
+      xml.XmlElement paragraph,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counter) {
     final spans = <InlineSpan>[];
 
     // Handle unordered or ordered list items
     final isListItem =
         paragraph.getElement('w:pPr')?.getElement('w:numPr') != null;
-    final listLevel = _getListLevel(paragraph);
 
     if (isListItem) {
-      // Handle list item with a bullet or number
-      spans.add(WidgetSpan(
-          child: Padding(
-        padding: const EdgeInsets.only(left: 20),
-        child: Text(
-          _getListBullet(listLevel),
-          style: const TextStyle(
-              fontSize: 16, fontWeight: FontWeight.normal, color: Colors.black),
-        ),
-      )));
+      final numPr = paragraph.getElement('w:pPr')?.getElement('w:numPr');
+      final numId = numPr?.getElement('w:numId')?.getAttribute('w:val');
+      final ilvl = int.tryParse(
+            numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? '0',
+          ) ??
+          0;
+
+      if (numId != null && numberingDefinitions.containsKey(numId)) {
+        final listLevelStyle = numberingDefinitions[numId]?[ilvl];
+        int newLevel = level ?? ilvl;
+
+        if (listLevelStyle != null) {
+          if (listLevelStyle.toLowerCase() == 'bullet') {
+            level = null;
+          }
+          spans.add(WidgetSpan(
+            child: Padding(
+              padding: EdgeInsets.only(left: ilvl != 0 ? 30 : 20.0),
+              child: listLevelStyle.toLowerCase() == 'bullet'
+                  ? Text(
+                      _getBulletForLevel(ilvl),
+                      style: const TextStyle(
+                        fontSize: 20, // Adjust size based on level
+                        color: Colors.black,
+                      ),
+                    )
+                  : Text(
+                      _getFormattedListNumber(
+                          numberingDefinitions, counter, numId, newLevel),
+                      style: const TextStyle(color: Colors.black, fontSize: 16),
+                    ),
+            ),
+          ));
+        }
+      }
+    } else {
+      level = null;
+      enabled = false;
     }
 
     // Iterate through runs (text + style) in the paragraph
@@ -311,41 +261,102 @@ class DocxExtractor {
     return style; // Not a heading
   }
 
-  String _getListBullet(int level) {
-    // Customize list bullet or numbering based on the level
-    // Simple bullet for level 0, adjust for numbering as needed
-    if (level == 0) {
-      return '• '; // Bullet for level 0
-    }
-    // For other levels, return numbered list (you can customize this)
-    return '${level + 1}. ';
+// Helper to determine the list type
+
+// Helper to get list bullet (number or bullet symbol)
+  String _getBulletForLevel(int level) {
+    const bulletStyles = ['•', '◦', '▪', '▫', '»', '›', '⁃', '–'];
+    return bulletStyles[level % bulletStyles.length];
   }
 
-  static int _getListLevel(xml.XmlElement paragraph) {
-    // Extract the list level from the paragraph
-    final numPr = paragraph.getElement('w:pPr')?.getElement('w:numPr');
-    final ilvl = num.tryParse(
-            numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? "0") ??
-        0;
-    return ilvl.toInt();
+  int? level;
+  bool enabled = false;
+
+  /// Retrieves the formatted list number for an ordered list item
+  String _getFormattedListNumber(
+      Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counters,
+      String numId,
+      int ilvl) {
+    // Retrieve the format for the current level
+    final format = numberingDefinitions[numId]?[ilvl] ?? 'decimal';
+
+    // Increment the counter for the given numId and ilvl
+    final key = '$numId-$ilvl';
+    counters[key] = (counters[key] ?? 0) + 1;
+    final number = counters[key]!;
+
+    // Generate list number based on format
+    switch (format.toLowerCase()) {
+      case 'decimal':
+        return '$number.'; // Example: 1., 2., 3.
+      case 'lowerroman':
+        return '${_toRoman(number).toLowerCase()}.'; // Example: i., ii., iii.
+      case 'upperroman':
+        return '${_toRoman(number).toUpperCase()}.'; // Example: I., II., III.
+      case 'lowerletter':
+        return '${String.fromCharCode(97 + (number - 1))}.'; // Example: a., b., c.
+      case 'upperletter':
+        return '${String.fromCharCode(65 + (number - 1))}.'; // Example: A., B., C.
+      default:
+        return '$number.'; // Fallback to decimal
+    }
   }
+
+  String _toRoman(int number) {
+    final romanNumerals = [
+      'M',
+      'CM',
+      'D',
+      'CD',
+      'C',
+      'XC',
+      'L',
+      'XL',
+      'X',
+      'IX',
+      'V',
+      'IV',
+      'I'
+    ];
+    final romanValues = [1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1];
+    var result = '';
+    var i = 0;
+
+    while (number > 0) {
+      while (number >= romanValues[i]) {
+        result += romanNumerals[i];
+        number -= romanValues[i];
+      }
+      i++;
+    }
+    return result;
+  }
+
+  /// Retrieves the list type (ordered/unordered) based on paragraph properties
 
   List<Widget> _parseContent(
-      xml.XmlDocument documentXml, Map<String, Uint8List> imageMap) {
+      xml.XmlDocument documentXml,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions) {
     final widgets = <Widget>[];
-
+    final counters = <String, int>{};
     for (final body in documentXml.findAllElements('w:body')) {
       for (final element in body.children.whereType<xml.XmlElement>()) {
+        // log(element.name.local);
         switch (element.name.local) {
           case 'p':
-            widgets.add(_parseParagraph(element, imageMap));
+            widgets.add(_parseParagraph(
+                element, imageMap, numberingDefinitions, counters));
             break;
           case 'tbl':
-            widgets.add(_parseTable(element, imageMap));
+            widgets.add(
+                _parseTable(element, imageMap, numberingDefinitions, counters));
             break;
 
           case 'sdt':
-            widgets.add(_parseSdt(element, imageMap));
+            widgets.add(
+                _parseSdt(element, imageMap, numberingDefinitions, counters));
             break;
           // case 'sectPr':
           //   widgets.add(_parseSectionProperties(element));
@@ -357,7 +368,11 @@ class DocxExtractor {
     return widgets;
   }
 
-  Widget _parseTable(xml.XmlElement table, Map<String, Uint8List> imageMap) {
+  Widget _parseTable(
+      xml.XmlElement table,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counter) {
     final rows = <TableRow>[];
 
     // Parse table border properties
@@ -377,7 +392,8 @@ class DocxExtractor {
         final backgroundColor = _parseCellBackgroundColor(cell);
 
         cell.findAllElements('w:p').forEach((paragraph) {
-          cellContent.add(_parseParagraph(paragraph, imageMap));
+          cellContent.add(_parseParagraph(
+              paragraph, imageMap, numberingDefinitions, counter));
         });
 
         cells.add(Container(
@@ -449,7 +465,11 @@ class DocxExtractor {
     }
   }
 
-  Widget _parseSdt(xml.XmlElement sdtElement, Map<String, Uint8List> imageMap) {
+  Widget _parseSdt(
+      xml.XmlElement sdtElement,
+      Map<String, Uint8List> imageMap,
+      Map<String, Map<int, String>> numberingDefinitions,
+      Map<String, int> counter) {
     final content = sdtElement
         .findAllElements('w:sdtContent')
         .expand((contentElement) => contentElement.children)
@@ -458,9 +478,11 @@ class DocxExtractor {
     final contentWidgets = content.map((childElement) {
       switch (childElement.name.local) {
         case 'p':
-          return _parseParagraph(childElement, imageMap);
+          return _parseParagraph(
+              childElement, imageMap, numberingDefinitions, counter);
         case 'tbl':
-          return _parseTable(childElement, imageMap);
+          return _parseTable(
+              childElement, imageMap, numberingDefinitions, counter);
         default:
           return Text(childElement.innerText);
       }
@@ -472,52 +494,16 @@ class DocxExtractor {
     );
   }
 
-  // static Widget _parseSectionProperties(xml.XmlElement sectPrElement) {
-  //   final pageSettings = <Widget>[];
-
-  //   // Extract page size
-  //   final pgSz = sectPrElement.getElement('w:pgSz');
-  //   if (pgSz != null) {
-  //     final width = pgSz.getAttribute('w:w');
-  //     final height = pgSz.getAttribute('w:h');
-  //     if (width != null && height != null) {
-  //       pageSettings.add(Text('Page Size: ${width}x$height twips'));
-  //     }
-  //   }
-
-  //   // Extract margins
-  //   final pgMar = sectPrElement.getElement('w:pgMar');
-  //   if (pgMar != null) {
-  //     final top = pgMar.getAttribute('w:top');
-  //     final bottom = pgMar.getAttribute('w:bottom');
-  //     final left = pgMar.getAttribute('w:left');
-  //     final right = pgMar.getAttribute('w:right');
-  //     pageSettings.add(Text(
-  //         'Margins - Top: $top, Bottom: $bottom, Left: $left, Right: $right'));
-  //   }
-
-  //   return Column(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: pageSettings,
-  //   );
-  // }
-
   TextStyle _parseRunStyle(xml.XmlElement? styleElement) {
     if (styleElement == null) return const TextStyle();
 
-    // final styleId = styleElement.getAttribute('w:styleId');
-    // log("style id $styleId");
-    // if (_styleMapping[styleId ?? ''] != null) {
-    //   return _styleMapping[styleId ?? '']!;
-    // }
-    // Check for basic style properties (bold, italic, underline)
     final isBold = styleElement.findElements('w:b').isNotEmpty;
     final isItalic = styleElement.findElements('w:i').isNotEmpty;
     final isUnderline = styleElement.findElements('w:u').isNotEmpty;
 
     // Parse font size (half-points to points)
     final fontSize = double.tryParse(
-          styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '32',
+          styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '20',
         ) ??
         16.0;
     // Parse text color (if available)
@@ -559,12 +545,6 @@ class DocxExtractor {
       backgroundColor: backgroundColor, // Set the background color
     );
   }
-
-  // TextStyle _parseRunStyle(xml.XmlElement? styleElement) {
-  //   if (styleElement == null) return const TextStyle();
-  //   final styleId = styleElement.getAttribute('w:styleId');
-  //   return _styleMapping[styleId ?? ''] ?? const TextStyle();
-  // }
 
   Color _hexToColor(String hex) {
     try {
