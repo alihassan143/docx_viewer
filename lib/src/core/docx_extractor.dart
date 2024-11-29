@@ -26,7 +26,6 @@ class DocxExtractor {
       // Parse XML
       final documentXml =
           xml.XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
-      log(documentXml.toXmlString());
       final relsXml =
           xml.XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
       if (numberingXmlFile != null) {
