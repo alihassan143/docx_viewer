@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 
-import 'package:xml/xml.dart' as xml;
+import 'package:xml/xml.dart';
 
 import '../../docx_file_viewer.dart';
 
@@ -25,9 +25,9 @@ class DocxExtractor {
       //     archive.files.firstWhere((file) => file.name == 'word/styles.xml');
       // Parse XML
       final documentXml =
-          xml.XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
+          XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
       final relsXml =
-          xml.XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
+          XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
       if (numberingXmlFile != null) {
         final numberingXmlContent =
             utf8.decode(numberingXmlFile.content as List<int>);
@@ -49,7 +49,7 @@ class DocxExtractor {
   }
 
   Map<String, Map<int, String>> parseNumberingDefinitions(String numberingXml) {
-    final document = xml.XmlDocument.parse(numberingXml);
+    final document = XmlDocument.parse(numberingXml);
     final numberingMap = <String, Map<int, String>>{};
 
     // Iterate through all abstractNum elements
@@ -72,7 +72,7 @@ class DocxExtractor {
   }
 
   Map<String, Uint8List> _extractImageRelationships(
-      xml.XmlDocument relsXml, Archive archive) {
+      XmlDocument relsXml, Archive archive) {
     final imageMap = <String, Uint8List>{};
 
     relsXml.findAllElements('Relationship').forEach((rel) {
@@ -93,7 +93,7 @@ class DocxExtractor {
   }
 
   Widget _parseParagraph(
-      xml.XmlElement paragraph,
+      XmlElement paragraph,
       Map<String, Uint8List> imageMap,
       Map<String, Map<int, String>> numberingDefinitions,
       Map<String, int> counter) {
@@ -189,10 +189,16 @@ class DocxExtractor {
 
     // Handle headings
     final headingStyle = _parseHeadingStyle(paragraph);
+    // Handle paragraph spacing
+    final paragraphSpacing = _parseParagraphSpacing(paragraph);
+    final textAlignment =
+        getTextAlign(paragraph.getElement('w:pPr')?.getElement('w:jc'));
+
     if (headingStyle != null) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 12.0),
+        padding: paragraphSpacing,
         child: RichText(
+          textAlign: textAlignment,
           text: TextSpan(
             children: spans,
             style: headingStyle,
@@ -202,11 +208,11 @@ class DocxExtractor {
     }
 
     // Handle paragraph spacing
-    final paragraphSpacing = _parseParagraphSpacing(paragraph);
 
     return Padding(
       padding: paragraphSpacing,
       child: RichText(
+        textAlign: textAlignment,
         text: TextSpan(
           children: spans,
           style: const TextStyle(fontSize: 16),
@@ -215,7 +221,31 @@ class DocxExtractor {
     );
   }
 
-  EdgeInsets _parseParagraphSpacing(xml.XmlElement paragraph) {
+  TextAlign getTextAlign(XmlElement? alignment) {
+    final String? alignementValue = alignment?.getAttribute("w:val");
+    log(alignementValue.toString());
+    if (alignementValue == null) {
+      return TextAlign.start;
+    }
+    switch (alignementValue) {
+      case "left":
+        return TextAlign.left;
+      case "center":
+        return TextAlign.center;
+      case "start":
+        return TextAlign.start;
+      case "end":
+        return TextAlign.end;
+      case "right":
+        return TextAlign.right;
+      case "both":
+        return TextAlign.justify;
+      default:
+        return TextAlign.start;
+    }
+  }
+
+  EdgeInsets _parseParagraphSpacing(XmlElement paragraph) {
     final pPr = paragraph.getElement('w:pPr');
     final before = int.tryParse(
             pPr?.getElement('w:spacing')?.getAttribute('w:before') ?? "0") ??
@@ -231,7 +261,7 @@ class DocxExtractor {
     );
   }
 
-  TextStyle? _parseHeadingStyle(xml.XmlElement paragraph) {
+  TextStyle? _parseHeadingStyle(XmlElement paragraph) {
     final pStyle = paragraph
         .getElement('w:pPr')
         ?.getElement('w:pStyle')
@@ -335,13 +365,13 @@ class DocxExtractor {
   /// Retrieves the list type (ordered/unordered) based on paragraph properties
 
   List<Widget> _parseContent(
-      xml.XmlDocument documentXml,
+      XmlDocument documentXml,
       Map<String, Uint8List> imageMap,
       Map<String, Map<int, String>> numberingDefinitions) {
     final widgets = <Widget>[];
     final counters = <String, int>{};
     for (final body in documentXml.findAllElements('w:body')) {
-      for (final element in body.children.whereType<xml.XmlElement>()) {
+      for (final element in body.children.whereType<XmlElement>()) {
         // log(element.name.local);
         switch (element.name.local) {
           case 'p':
@@ -368,7 +398,7 @@ class DocxExtractor {
   }
 
   Widget _parseTable(
-      xml.XmlElement table,
+      XmlElement table,
       Map<String, Uint8List> imageMap,
       Map<String, Map<int, String>> numberingDefinitions,
       Map<String, int> counter) {
@@ -434,7 +464,7 @@ class DocxExtractor {
   }
 
   // Parse table border style (color, width)
-  TableBorderStyle _parseTableBorderStyle(xml.XmlElement table) {
+  TableBorderStyle _parseTableBorderStyle(XmlElement table) {
     final borderColor = table
             .getElement('w:tblBorders')
             ?.getElement('w:top')
@@ -453,7 +483,7 @@ class DocxExtractor {
   }
 
   // Parse background color (shading) for a table cell
-  Color _parseCellBackgroundColor(xml.XmlElement cell) {
+  Color _parseCellBackgroundColor(XmlElement cell) {
     final shading = cell.getElement('w:shd');
     final fillColor = shading?.getAttribute('w:fill');
 
@@ -465,14 +495,14 @@ class DocxExtractor {
   }
 
   Widget _parseSdt(
-      xml.XmlElement sdtElement,
+      XmlElement sdtElement,
       Map<String, Uint8List> imageMap,
       Map<String, Map<int, String>> numberingDefinitions,
       Map<String, int> counter) {
     final content = sdtElement
         .findAllElements('w:sdtContent')
         .expand((contentElement) => contentElement.children)
-        .whereType<xml.XmlElement>();
+        .whereType<XmlElement>();
 
     final contentWidgets = content.map((childElement) {
       switch (childElement.name.local) {
@@ -493,7 +523,7 @@ class DocxExtractor {
     );
   }
 
-  TextStyle _parseRunStyle(xml.XmlElement? styleElement) {
+  TextStyle _parseRunStyle(XmlElement? styleElement) {
     if (styleElement == null) return const TextStyle();
 
     final isBold = styleElement.findElements('w:b').isNotEmpty;
