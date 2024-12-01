@@ -1,4 +1,7 @@
+## 0.0.5
 
+*  Feat:styles are now parsed from file for paragraph and character
+*  Feat:text align are now parsed from file
 ## 0.0.4
 
 *  fixed order and unordered lists
