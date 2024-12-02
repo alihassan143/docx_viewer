@@ -11,17 +11,20 @@ class DocxExtractor {
     try {
       Map<String, Map<int, String>> numberingMap = {};
       Map<String, Map<String, TextStyle?>> documentStyles = {};
+      Map<String, Uint8List> imageMap = {};
       final archive = ZipDecoder().decodeBytes(await file.readAsBytes());
 
       // Extract document.xml and document.xml.rels
-      final documentXmlFile =
-          archive.files.firstWhere((file) => file.name == 'word/document.xml');
+      final documentXmlFile = archive.files
+          .where((file) => file.name == 'word/document.xml')
+          .firstOrNull;
       final numberingXmlFile = archive.files
           .where((file) => file.name == 'word/numbering.xml')
           .firstOrNull;
 
       final relsXmlFile = archive.files
-          .firstWhere((file) => file.name == 'word/_rels/document.xml.rels');
+          .where((file) => file.name == 'word/_rels/document.xml.rels')
+          .firstOrNull;
       final stylesXmlFile = archive.files
           .where((file) => file.name == 'word/styles.xml')
           .firstOrNull;
@@ -31,19 +34,24 @@ class DocxExtractor {
 
         documentStyles = _parseStyles(styleXml);
       }
-
+      if (documentXmlFile == null) {
+        return [];
+      }
       // Parse XML
       final documentXml =
           XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
-
-      final relsXml =
-          XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
+      if (relsXmlFile != null) {
+        final relsXml =
+            XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
+        imageMap = _extractImageRelationships(relsXml, archive);
+      }
+      log(documentXml.toXmlString());
       if (numberingXmlFile != null) {
         final numberingXmlContent =
             utf8.decode(numberingXmlFile.content as List<int>);
         numberingMap = parseNumberingDefinitions(numberingXmlContent);
       }
-      final imageMap = _extractImageRelationships(relsXml, archive);
+
       // await _loadFontsFromFontTable(archive);
       // await _loadStyles(stylesXml);
       // Parse the content
@@ -149,6 +157,8 @@ class DocxExtractor {
         .getElement('w:pPr')
         ?.getElement('w:pStyle')
         ?.getAttribute('w:val');
+    final borderElement =
+        paragraph.getElement('w:pPr')?.findElements('w:pBdr').firstOrNull;
     // Handle unordered or ordered list items
     final isListItem =
         paragraph.getElement('w:pPr')?.getElement('w:numPr') != null;
@@ -258,11 +268,15 @@ class DocxExtractor {
     if (headingStyle != null) {
       return Padding(
         padding: paragraphSpacing,
-        child: RichText(
-          textAlign: textAlignment,
-          text: TextSpan(
-            children: spans,
-            style: mergedStye ?? headingStyle,
+        child: Container(
+          decoration: BoxDecoration(
+              color: Colors.transparent, border: createBorder(borderElement)),
+          child: RichText(
+            textAlign: textAlignment,
+            text: TextSpan(
+              children: spans,
+              style: headingStyle.merge(mergedStye),
+            ),
           ),
         ),
       );
@@ -280,6 +294,64 @@ class DocxExtractor {
         ),
       ),
     );
+  }
+
+  Border createBorder(XmlElement? borderElement) {
+    final top = borderElement?.findElements('w:top').firstOrNull;
+    final bottom = borderElement?.findElements('w:bottom').firstOrNull;
+    final left = borderElement?.findElements('w:left').firstOrNull;
+    final right = borderElement?.findElements('w:right').firstOrNull;
+
+    return Border(
+      top: top != null ? parseBorderSide(top) : BorderSide.none,
+      bottom: bottom != null ? parseBorderSide(bottom) : BorderSide.none,
+      left: left != null ? parseBorderSide(left) : BorderSide.none,
+      right: right != null ? parseBorderSide(right) : BorderSide.none,
+    );
+  }
+
+  BorderSide parseBorderSide(XmlElement? element) {
+    if (element == null) {
+      return BorderSide.none;
+    }
+    final style = element.getAttribute('w:val') ?? 'single';
+    final color = element.getAttribute('w:color') != null
+        ? _hexToColor(element.getAttribute('w:color')!)
+        : Colors.transparent;
+
+    final width =
+        (double.tryParse(element.getAttribute('w:sz') ?? '0') ?? 0) / 8.0;
+
+    return getBorderSide(style, color, width);
+  }
+
+  BorderSide getBorderSide(String style, Color color, double width) {
+    switch (style) {
+      case 'single':
+      case 'thick':
+        return BorderSide(color: color, width: width);
+      case 'double':
+        return BorderSide(color: color, width: width, style: BorderStyle.solid);
+      case 'dashed':
+      case 'dotted':
+        return BorderSide(color: color, width: width, style: BorderStyle.solid);
+      case 'wave':
+      case 'doubleWave':
+        return BorderSide(color: color, width: width, style: BorderStyle.solid);
+      case 'triple':
+      case 'inset':
+      case 'outset':
+        return BorderSide(color: color, width: width, style: BorderStyle.solid);
+      case 'thickThinLargeGap':
+      case 'thinThickSmallGap':
+      case 'thinThickThinMediumGap':
+        return BorderSide(color: color, width: width, style: BorderStyle.solid);
+      case 'threeDEmboss':
+      case 'threeDEngrave':
+        return BorderSide(color: color.withOpacity(0.8), width: width);
+      default:
+        return BorderSide.none;
+    }
   }
 
   TextAlign getTextAlign(XmlElement? alignment) {
