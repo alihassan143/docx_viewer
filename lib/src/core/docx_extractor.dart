@@ -10,7 +10,7 @@ class DocxExtractor {
   final Map<String, Map<int, String>> numberingDefinitions = {};
   final Map<String, Map<String, TextStyle?>> documentStyles = {};
   final Map<String, Border> documentBorder = {};
-
+  final Map<String, TextAlign> documentTextAlignment = {};
   final Map<String, Uint8List> imageMap = {};
   Future<List<Widget>> renderLayout(File file) async {
     try {
@@ -81,6 +81,7 @@ class DocxExtractor {
   void _parseStyles(XmlDocument stylesXml) {
     final stylesMap = <String, Map<String, TextStyle?>>{};
     final newBorderMap = <String, Border>{};
+    final newTextAlignMap = <String, TextAlign>{};
     // log(stylesXml.toXmlString());
     for (final styleElement in stylesXml.findAllElements('w:style')) {
       final styleId = styleElement.getAttribute('w:styleId');
@@ -90,21 +91,20 @@ class DocxExtractor {
         final rPrElement = styleElement.getElement('w:rPr');
         TextStyle? paragraphId;
         Border? border;
+        TextAlign? textAlign;
         // log("StyleId:$styleId ${rPrElement.toXmlString()}");
         final parsedStyles = _parseRunStyle(rPrElement);
 
         final pPRStyle = styleElement.getElement('w:pPr');
         if (pPRStyle != null) {
           final pPRStyleId = _parseRunStyle(pPRStyle);
+
           Border newBorder =
-              createBorder(styleElement.findElements('w:pBdr').firstOrNull);
+              createBorder(pPRStyle.findElements('w:pBdr').firstOrNull);
 
           paragraphId = pPRStyleId;
           border = newBorder;
-          if (styleId == "Title") {
-            log(border.toString());
-            log(parsedStyles.toString());
-          }
+          textAlign = getTextAlign(pPRStyle.getElement('w:jc'));
         }
 
         stylesMap[styleId] = {
@@ -114,12 +114,16 @@ class DocxExtractor {
         if (border != null) {
           newBorderMap[styleId] = border;
         }
+        if (textAlign != null) {
+          newTextAlignMap[styleId] = textAlign;
+        }
       }
 
       // Parse attributes for the text style
     }
     documentBorder.addAll(newBorderMap);
     documentStyles.addAll(stylesMap);
+    documentTextAlignment.addAll(newTextAlignMap);
   }
 
   void parseNumberingDefinitions(String numberingXml) {
@@ -182,12 +186,14 @@ class DocxExtractor {
         paragraph.getElement('w:pPr')?.getElement('w:numPr') != null;
 
     TextStyle? mergedStye;
+    TextAlign? textAlignment;
     Border? border;
     if (pprStyleId != null) {
       mergedStye = documentStyles[pprStyleId]?["paragraph" "pPr"];
       mergedStye =
           mergedStye?.merge(documentStyles[pprStyleId]?["paragraph" "rPr"]);
       border = documentBorder[pprStyleId];
+      textAlignment = documentTextAlignment[pprStyleId];
     }
     mergedStye ??= const TextStyle(color: Colors.black);
 
@@ -294,7 +300,7 @@ class DocxExtractor {
     final headingStyle = _parseHeadingStyle(paragraph);
     // Handle paragraph spacing
     final paragraphSpacing = _parseParagraphSpacing(paragraph);
-    final textAlignment =
+    final newtextAlignment =
         getTextAlign(paragraph.getElement('w:pPr')?.getElement('w:jc'));
 
     if (headingStyle != null) {
@@ -305,7 +311,7 @@ class DocxExtractor {
               color: Colors.transparent,
               border: border ?? createBorder(borderElement)),
           child: RichText(
-            textAlign: textAlignment,
+            textAlign: textAlignment ?? newtextAlignment,
             text: TextSpan(
               children: spans,
               style: headingStyle.merge(mergedStye),
@@ -320,7 +326,7 @@ class DocxExtractor {
     return Padding(
       padding: paragraphSpacing,
       child: RichText(
-        textAlign: textAlignment,
+        textAlign: textAlignment ?? newtextAlignment,
         text: TextSpan(
           children: spans,
           style: mergedStye,
