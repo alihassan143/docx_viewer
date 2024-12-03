@@ -27,9 +27,9 @@ class DocxExtractor {
       final relsXmlFile = archive.files
           .where((file) => file.name == 'word/_rels/document.xml.rels')
           .firstOrNull;
-      final themeXmlFIle = archive.files
-          .where((file) => file.name == 'word/theme/theme1.xml')
-          .firstOrNull;
+      // final themeXmlFIle = archive.files
+      //     .where((file) => file.name == 'word/theme/theme1.xml')
+      // .firstOrNull;
       final stylesXmlFile = archive.files
           .where((file) => file.name == 'word/styles.xml')
           .firstOrNull;
@@ -323,8 +323,7 @@ class DocxExtractor {
         textAlign: textAlignment,
         text: TextSpan(
           children: spans,
-          style:
-              mergedStye ?? const TextStyle(fontSize: 16, color: Colors.black),
+          style: mergedStye,
         ),
       ),
     );
