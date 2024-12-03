@@ -1,3 +1,7 @@
+## 0.0.6
+
+*  Fix:styles are too much bigger than expected
+*  Fix: if color is defined than don't apply default color
 ## 0.0.5
 
 *  Feat:styles are now parsed from file for paragraph and character
