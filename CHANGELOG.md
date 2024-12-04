@@ -1,3 +1,7 @@
+## 0.0.7
+
+*  feat:now text alignment from styles are now parsed
+*  feat: background color borders are now parsed properly for paragraph and text elements
 ## 0.0.6
 
 *  Fix:styles are too much bigger than expected
