@@ -12,6 +12,8 @@ class DocxExtractor {
   final Map<String, Border> documentBorder = {};
   final Map<String, TextAlign> documentTextAlignment = {};
   final Map<String, Uint8List> imageMap = {};
+  final Map<String, TableBorder> tablesBorders = {};
+  final Map<String, EdgeInsetsGeometry> tablesCellPadding = {};
   Future<List<Widget>> renderLayout(File file) async {
     try {
       final archive = ZipDecoder().decodeBytes(await file.readAsBytes());
@@ -50,6 +52,7 @@ class DocxExtractor {
       // Parse XML
       final documentXml =
           XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
+
       if (relsXmlFile != null) {
         final relsXml =
             XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
@@ -82,6 +85,8 @@ class DocxExtractor {
     final stylesMap = <String, Map<String, TextStyle?>>{};
     final newBorderMap = <String, Border>{};
     final newTextAlignMap = <String, TextAlign>{};
+    final newTableBorder = <String, TableBorder>{};
+    final newCellPadding = <String, EdgeInsetsGeometry>{};
     // log(stylesXml.toXmlString());
     for (final styleElement in stylesXml.findAllElements('w:style')) {
       final styleId = styleElement.getAttribute('w:styleId');
@@ -89,6 +94,8 @@ class DocxExtractor {
 
       if (styleId != null && type != null) {
         final rPrElement = styleElement.getElement('w:rPr');
+        final tableBorderElement = styleElement.getElement('w:tblPr');
+
         TextStyle? paragraphId;
         Border? border;
         TextAlign? textAlign;
@@ -106,6 +113,19 @@ class DocxExtractor {
           border = newBorder;
           textAlign = getTextAlign(pPRStyle.getElement('w:jc'));
         }
+        if (tableBorderElement != null) {
+          final tableborder =
+              _parseTableStyle(tableBorderElement.getElement('w:tblBorders'));
+          if (tableborder != null) {
+            newTableBorder[styleId] = tableborder;
+          }
+        }
+        if (tableBorderElement != null) {
+          final tablePadding =
+              _parseCellMargin(tableBorderElement.getElement('w:tblCellMar'));
+
+          newCellPadding[styleId] = tablePadding;
+        }
 
         stylesMap[styleId] = {
           "${type}pPr": paragraphId,
@@ -121,9 +141,58 @@ class DocxExtractor {
 
       // Parse attributes for the text style
     }
+    tablesBorders.addAll(newTableBorder);
+    tablesCellPadding.addAll(newCellPadding);
     documentBorder.addAll(newBorderMap);
     documentStyles.addAll(stylesMap);
     documentTextAlignment.addAll(newTextAlignMap);
+  }
+
+  TableBorder? _parseTableStyle(XmlElement? element) {
+    if (element == null) {
+      return null;
+    }
+
+    final topBorder = element.findElements('w:top').firstOrNull;
+    final bottomBorder = element.findElements('w:bottom').firstOrNull;
+    final leftBorder = element.findElements('w:left').firstOrNull;
+    final rightBorder = element.findElements('w:right').firstOrNull;
+
+    return TableBorder(
+        top: _parseBorderSide(topBorder),
+        left: _parseBorderSide(leftBorder),
+        right: _parseBorderSide(rightBorder),
+        bottom: _parseBorderSide(bottomBorder));
+  }
+
+  BorderSide _parseBorderSide(XmlElement? element) {
+    if (element == null) return const BorderSide();
+    final color = element.getAttribute('w:color') != null
+        ? _hexToColor(element.getAttribute('w:color')!)
+        : Colors.transparent;
+    final width = double.tryParse(element.getAttribute('w:sz') ?? "0");
+
+    return BorderSide(color: color, width: (width ?? 8) / 8);
+  }
+
+  EdgeInsetsGeometry _parseCellMargin(XmlElement? element) {
+    if (element == null) return EdgeInsets.zero;
+    final topPadding = element.findElements('w:top').firstOrNull;
+    final bottomPadding = element.findElements('w:bottom').firstOrNull;
+    final leftPadding = element.findElements('w:left').firstOrNull;
+    final rightPadding = element.findElements('w:right').firstOrNull;
+
+    return EdgeInsets.only(
+        bottom: _parseCellMarginValue(bottomPadding),
+        left: _parseCellMarginValue(leftPadding),
+        right: _parseCellMarginValue(rightPadding),
+        top: _parseCellMarginValue(topPadding));
+  }
+
+  double _parseCellMarginValue(XmlElement? element) {
+    final value = double.tryParse(element?.getAttribute('w:w') ?? "0") ?? 0;
+
+    return value / 15;
   }
 
   void parseNumberingDefinitions(String numberingXml) {
@@ -181,6 +250,18 @@ class DocxExtractor {
         ?.getAttribute('w:val');
     final borderElement =
         paragraph.getElement('w:pPr')?.findElements('w:pBdr').firstOrNull;
+    final backgroundColorElement =
+        paragraph.getElement('w:pPr')?.findElements('w:shd').firstOrNull;
+    String? bgHex;
+    if (backgroundColorElement != null &&
+        backgroundColorElement.getAttribute('w:val') != "clear") {
+      bgHex = backgroundColorElement.getAttribute('w:val');
+    } else if (backgroundColorElement != null) {
+      bgHex = backgroundColorElement.getAttribute('w:fill');
+    }
+    final backgroundColor = bgHex != null && bgHex != 'auto'
+        ? _hexToColor(bgHex)
+        : Colors.transparent;
     // Handle unordered or ordered list items
     final isListItem =
         paragraph.getElement('w:pPr')?.getElement('w:numPr') != null;
@@ -244,6 +325,8 @@ class DocxExtractor {
       final tabs = run.findElements('w:tab');
       for (final textelement in text) {
         TextStyle style = _parseRunStyle(run.getElement('w:rPr'));
+        final borderElement = run.getElement('w:rPr')?.getElement('w:bdr');
+        Border newCharacterBorder = characterBorder(borderElement);
 
         final characterId = run
             .getElement('w:rPr')
@@ -253,11 +336,22 @@ class DocxExtractor {
         if (characterId != null) {
           style = documentStyles[characterId]?["character" "rPr"] ?? style;
         }
-
-        spans.add(TextSpan(
-          text: textelement.innerText,
-          style: style,
-        ));
+        if (borderElement == null) {
+          spans.add(TextSpan(
+            text: textelement.innerText,
+            style: style,
+          ));
+        } else {
+          spans.add(WidgetSpan(
+            child: Container(
+              decoration: BoxDecoration(border: newCharacterBorder),
+              child: Text(
+                textelement.innerText,
+                style: style,
+              ),
+            ),
+          ));
+        }
       }
       for (var tab in tabs) {
         final pos = int.tryParse(tab.getAttribute('pos') ?? '0') ?? 0;
@@ -308,7 +402,7 @@ class DocxExtractor {
         padding: paragraphSpacing,
         child: Container(
           decoration: BoxDecoration(
-              color: Colors.transparent,
+              color: backgroundColor,
               border: border ?? createBorder(borderElement)),
           child: RichText(
             textAlign: textAlignment ?? newtextAlignment,
@@ -325,11 +419,16 @@ class DocxExtractor {
 
     return Padding(
       padding: paragraphSpacing,
-      child: RichText(
-        textAlign: textAlignment ?? newtextAlignment,
-        text: TextSpan(
-          children: spans,
-          style: mergedStye,
+      child: Container(
+        decoration: BoxDecoration(
+            color: backgroundColor,
+            border: border ?? createBorder(borderElement)),
+        child: RichText(
+          textAlign: textAlignment ?? newtextAlignment,
+          text: TextSpan(
+            children: spans,
+            style: mergedStye,
+          ),
         ),
       ),
     );
@@ -431,6 +530,17 @@ class DocxExtractor {
       left: left != null ? parseBorderSide(left) : BorderSide.none,
       right: right != null ? parseBorderSide(right) : BorderSide.none,
     );
+  }
+
+  Border characterBorder(XmlElement? borderElement) {
+    if (borderElement == null) return const Border();
+    final thichness = borderElement.getAttribute('w:sz');
+    final width = double.tryParse(thichness ?? "8") ?? 8;
+    final color = borderElement.getAttribute('w:color') != null
+        ? _hexToColor(borderElement.getAttribute('w:color')!)
+        : Colors.transparent;
+
+    return Border.all(color: color, width: width / 8);
   }
 
   BorderSide parseBorderSide(XmlElement? element) {
