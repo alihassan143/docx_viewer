@@ -772,7 +772,12 @@ class DocxExtractor {
     required Map<String, int> counter,
   }) {
     final rows = <TableRow>[];
-
+    TableBorder? tableBorder;
+    final tableBorderStyleid =
+        table.getElement("w:tblStyle")?.getAttribute('w:val');
+    if (tableBorderStyleid != null) {
+      tableBorder = tablesBorders[tableBorderStyleid];
+    }
     // Parse table border properties
     final borderStyle = _parseTableBorderStyle(table);
 
@@ -828,7 +833,7 @@ class DocxExtractor {
     }
 
     return Table(
-      border:
+      border: tableBorder ??
           TableBorder.all(color: borderStyle.color, width: borderStyle.width),
       children: rows,
     );
