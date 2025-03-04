@@ -12,18 +12,18 @@ class DocxViewer extends StatefulWidget {
 }
 
 class _DocxViewerState extends State<DocxViewer> {
-  late final Future<List<Widget>> loadDocumet;
+  late final Future<List<Widget>> loadDocument;
   @override
   void initState() {
     super.initState();
-    loadDocumet = DocxExtractor().renderLayout(widget.file);
+    loadDocument = DocxExtractor().renderLayout(widget.file);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: FutureBuilder(
-        future: loadDocumet,
+        future: loadDocument,
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             return InteractiveViewer(
