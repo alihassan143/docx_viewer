@@ -608,7 +608,7 @@ class DocxExtractor {
 // Helper to get list bullet (number or bullet symbol)
   Widget _getBulletForLevel(int level) {
     List<String> bulletStyles = <String>['•', '◦', '∙', '▪', '▫', '»', '›', '⁃', '–'];
-    List<double> bulletOffset = <double>[-3.5, -1, 1, 10, 10, 10, 10, 10, 10];
+    List<double> bulletOffset = <double>[-3.5, -1, 1, 0, 0, 0, 0, 0, 0];
     int bulletIndex = level % bulletStyles.length;
     String bullet = bulletStyles[bulletIndex];
     double yOffset = bulletOffset[bulletIndex];
