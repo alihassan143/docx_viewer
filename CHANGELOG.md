@@ -1,3 +1,7 @@
+## 0.0.8
+
+*  Fix: Bullet alignment improved
+*  Fix: Heading styles 
 ## 0.0.7
 
 *  feat:now text alignment from styles are now parsed

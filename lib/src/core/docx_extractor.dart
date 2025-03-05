@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:xml/xml.dart';
 
 import '../../docx_file_viewer.dart';
+
 /// DocxExtractor contains the logic for extract the Docx annotations to parse it into Flutter widgets
 class DocxExtractor {
   final Map<String, Map<int, String>> _numberingDefinitions = <String, Map<int, String>>{};
@@ -153,7 +154,7 @@ class DocxExtractor {
   BorderSide _parseTableBorderSide(XmlElement? element) {
     if (element == null) return const BorderSide();
     final Color color =
-    element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
+        element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
     final double? width = double.tryParse(element.getAttribute('w:sz') ?? "0");
 
     return BorderSide(color: color, width: (width ?? 8) / 8);
@@ -213,7 +214,7 @@ class DocxExtractor {
       if (type.contains('image')) {
         final String filePath = 'word/$target';
         final ArchiveFile file = archive.files.firstWhere(
-              (ArchiveFile file) => file.name == filePath,
+          (ArchiveFile file) => file.name == filePath,
         );
         appimageMap[id] = Uint8List.fromList(file.content);
       }
@@ -255,8 +256,8 @@ class DocxExtractor {
       final XmlElement? numPr = paragraph.getElement('w:pPr')?.getElement('w:numPr');
       final String? numId = numPr?.getElement('w:numId')?.getAttribute('w:val');
       final int ilvl = int.tryParse(
-        numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? '0',
-      ) ??
+            numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? '0',
+          ) ??
           0;
 
       if (numId != null && _numberingDefinitions.containsKey(numId)) {
@@ -274,11 +275,11 @@ class DocxExtractor {
               child: listLevelStyle.toLowerCase() == 'bullet'
                   ? _getBulletForLevel(ilvl)
                   : Transform.translate(
-                  offset: const Offset(0, -1),
-                  child: Text(
-                    _getFormattedListNumber(_numberingDefinitions, counter, numId, newLevel),
-                    style: const TextStyle(color: Colors.black, fontSize: 16),
-                  )),
+                      offset: const Offset(0, -1),
+                      child: Text(
+                        _getFormattedListNumber(_numberingDefinitions, counter, numId, newLevel),
+                        style: const TextStyle(color: Colors.black, fontSize: 16),
+                      )),
             ),
           ));
         }
@@ -333,12 +334,12 @@ class DocxExtractor {
       if (hasPageBreak != null) {
         spans.add(const WidgetSpan(
             child: SizedBox(
-              width: double.infinity,
-              child: Divider(
-                color: Colors.grey,
-                thickness: 1,
-              ),
-            )));
+          width: double.infinity,
+          child: Divider(
+            color: Colors.grey,
+            thickness: 1,
+          ),
+        )));
       }
 
       // Check for embedded images
@@ -359,19 +360,29 @@ class DocxExtractor {
     final TextStyle? headingStyle = _parseHeadingStyle(paragraph);
     // Handle paragraph spacing
     final EdgeInsets paragraphSpacing = _parseParagraphSpacing(paragraph);
-    final TextAlign newtextAlignment = _getTextAlign(paragraph.getElement('w:pPr')?.getElement('w:jc'));
+    final TextAlign newTextAlignment = _getTextAlign(paragraph.getElement('w:pPr')?.getElement('w:jc'));
 
     if (headingStyle != null) {
       return Padding(
         padding: paragraphSpacing,
         child: Container(
           decoration: BoxDecoration(color: backgroundColor, border: border ?? _createBorder(borderElement)),
-          child: RichText(
-            textAlign: textAlignment ?? newtextAlignment,
-            text: TextSpan(
-              children: spans,
-              style: headingStyle.merge(mergedStye),
-            ),
+          child: Text.rich(
+            TextSpan(
+                children: spans.map(
+              (InlineSpan span) {
+                if (span is TextSpan) {
+                  return TextSpan(
+                    text: span.toPlainText(),
+                    style: span.style != null ? span.style?.merge(headingStyle) : headingStyle,
+                  );
+                } else {
+                  return span;
+                }
+              },
+            ).toList()),
+            textAlign: textAlignment ?? newTextAlignment,
+            style: headingStyle,
           ),
         ),
       );
@@ -383,9 +394,9 @@ class DocxExtractor {
       padding: paragraphSpacing,
       child: Container(
         decoration: BoxDecoration(color: backgroundColor, border: border ?? _createBorder(borderElement)),
-        child: RichText(
-          textAlign: textAlignment ?? newtextAlignment,
-          text: TextSpan(
+        child: Text.rich(
+          textAlign: textAlignment ?? newTextAlignment,
+          TextSpan(
             children: spans,
             style: mergedStye,
           ),
@@ -446,7 +457,7 @@ class DocxExtractor {
           ],
         );
       case 'decimal':
-      // Decimal-aligned tab
+        // Decimal-aligned tab
         return Align(
           alignment: Alignment.centerLeft,
           child: SizedBox(
@@ -467,7 +478,7 @@ class DocxExtractor {
           ),
         );
       default:
-      // Default start-aligned tab
+        // Default start-aligned tab
         return SizedBox(
           width: tabWidth,
           child: Text(
@@ -497,7 +508,7 @@ class DocxExtractor {
     final String? thickness = borderElement.getAttribute('w:sz');
     final double width = double.tryParse(thickness ?? "8") ?? 8;
     final Color color =
-    borderElement.getAttribute('w:color') != null ? _hexToColor(borderElement.getAttribute('w:color')!) : Colors.transparent;
+        borderElement.getAttribute('w:color') != null ? _hexToColor(borderElement.getAttribute('w:color')!) : Colors.transparent;
 
     return Border.all(color: color, width: width / 8);
   }
@@ -508,7 +519,7 @@ class DocxExtractor {
     }
     final String style = element.getAttribute('w:val') ?? 'single';
     final Color color =
-    element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
+        element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
 
     final double width = (double.tryParse(element.getAttribute('w:sz') ?? '0') ?? 0) / 8.0;
 
@@ -574,10 +585,7 @@ class DocxExtractor {
     final int after = int.tryParse(pPr?.getElement('w:spacing')?.getAttribute('w:after') ?? "0") ?? 0;
 
     // Convert Word spacing units to Flutter padding (assume 20 units = 1 point)
-    return EdgeInsets.only(
-      top: before / 20,
-      bottom: after / 20,
-    );
+    return EdgeInsets.only(top: before / 20, bottom: after / 20);
   }
 
   TextStyle? _parseHeadingStyle(XmlElement paragraph) {
@@ -701,9 +709,9 @@ class DocxExtractor {
               counter: counters,
             ));
             break;
-        // case 'sectPr':
-        //   widgets.add(_parseSectionProperties(element));
-        // break;
+          // case 'sectPr':
+          //   widgets.add(_parseSectionProperties(element));
+          // break;
         }
       }
     }
@@ -849,8 +857,8 @@ class DocxExtractor {
     }
     // Parse font size (half-points to points)
     final double fontSize = double.tryParse(
-      styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '20',
-    ) ??
+          styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '20',
+        ) ??
         16.0;
 
     // Parse text color (if available)
