@@ -34,7 +34,7 @@ class DocxExtractor {
       // .firstOrNull;
       final ArchiveFile? stylesXmlFile = archive.files.where((ArchiveFile file) => file.name == 'word/styles.xml').firstOrNull;
       if (stylesXmlFile != null) {
-        final XmlDocument styleXml = XmlDocument.parse(String.fromCharCodes(stylesXmlFile.content));
+        final XmlDocument styleXml = XmlDocument.parse(utf8.decode(stylesXmlFile.content));
 
         _parseStyles(styleXml);
       }
@@ -43,14 +43,14 @@ class DocxExtractor {
       }
       // if (themeXmlFIle != null) {
       //   final themerel =
-      //       XmlDocument.parse(String.fromCharCodes(themeXmlFIle.content));
+      //       XmlDocument.parse(utf8.decode(themeXmlFIle.content));
       //   // log(themerel.toXmlString());
       // }
       // Parse XML
-      final XmlDocument documentXml = XmlDocument.parse(String.fromCharCodes(documentXmlFile.content));
+      final XmlDocument documentXml = XmlDocument.parse(utf8.decode(documentXmlFile.content));
 
       if (relsXmlFile != null) {
-        final XmlDocument relsXml = XmlDocument.parse(String.fromCharCodes(relsXmlFile.content));
+        final XmlDocument relsXml = XmlDocument.parse(utf8.decode(relsXmlFile.content));
         _extractImageRelationships(relsXml, archive);
       }
 
@@ -69,7 +69,7 @@ class DocxExtractor {
       log(e.toString());
       // Handle error, log it or provide a fallback widget
 
-      return <Widget>[const Text('Error parsing the document')]; // Fallback widget in case of error
+      return <Widget>[const Text('Error opening the document')]; // Fallback widget in case of error
     }
   }
 
@@ -154,7 +154,7 @@ class DocxExtractor {
   BorderSide _parseTableBorderSide(XmlElement? element) {
     if (element == null) return const BorderSide();
     final Color color =
-        element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
+    element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
     final double? width = double.tryParse(element.getAttribute('w:sz') ?? "0");
 
     return BorderSide(color: color, width: (width ?? 8) / 8);
@@ -214,7 +214,7 @@ class DocxExtractor {
       if (type.contains('image')) {
         final String filePath = 'word/$target';
         final ArchiveFile file = archive.files.firstWhere(
-          (ArchiveFile file) => file.name == filePath,
+              (ArchiveFile file) => file.name == filePath,
         );
         appimageMap[id] = Uint8List.fromList(file.content);
       }
@@ -256,8 +256,8 @@ class DocxExtractor {
       final XmlElement? numPr = paragraph.getElement('w:pPr')?.getElement('w:numPr');
       final String? numId = numPr?.getElement('w:numId')?.getAttribute('w:val');
       final int ilvl = int.tryParse(
-            numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? '0',
-          ) ??
+        numPr?.getElement('w:ilvl')?.getAttribute('w:val') ?? '0',
+      ) ??
           0;
 
       if (numId != null && _numberingDefinitions.containsKey(numId)) {
@@ -275,11 +275,11 @@ class DocxExtractor {
               child: listLevelStyle.toLowerCase() == 'bullet'
                   ? _getBulletForLevel(ilvl)
                   : Transform.translate(
-                      offset: const Offset(0, -1),
-                      child: Text(
-                        _getFormattedListNumber(_numberingDefinitions, counter, numId, newLevel),
-                        style: const TextStyle(color: Colors.black, fontSize: 16),
-                      )),
+                  offset: const Offset(0, -1),
+                  child: Text(
+                    _getFormattedListNumber(_numberingDefinitions, counter, numId, newLevel),
+                    style: const TextStyle(color: Colors.black, fontSize: 16),
+                  )),
             ),
           ));
         }
@@ -334,12 +334,12 @@ class DocxExtractor {
       if (hasPageBreak != null) {
         spans.add(const WidgetSpan(
             child: SizedBox(
-          width: double.infinity,
-          child: Divider(
-            color: Colors.grey,
-            thickness: 1,
-          ),
-        )));
+              width: double.infinity,
+              child: Divider(
+                color: Colors.grey,
+                thickness: 1,
+              ),
+            )));
       }
 
       // Check for embedded images
@@ -370,17 +370,17 @@ class DocxExtractor {
           child: Text.rich(
             TextSpan(
                 children: spans.map(
-              (InlineSpan span) {
-                if (span is TextSpan) {
-                  return TextSpan(
-                    text: span.toPlainText(),
-                    style: span.style != null ? span.style?.merge(headingStyle) : headingStyle,
-                  );
-                } else {
-                  return span;
-                }
-              },
-            ).toList()),
+                      (InlineSpan span) {
+                    if (span is TextSpan) {
+                      return TextSpan(
+                        text: span.toPlainText(),
+                        style: span.style != null ? span.style?.merge(headingStyle) : headingStyle,
+                      );
+                    } else {
+                      return span;
+                    }
+                  },
+                ).toList()),
             textAlign: textAlignment ?? newTextAlignment,
             style: headingStyle,
           ),
@@ -457,7 +457,7 @@ class DocxExtractor {
           ],
         );
       case 'decimal':
-        // Decimal-aligned tab
+      // Decimal-aligned tab
         return Align(
           alignment: Alignment.centerLeft,
           child: SizedBox(
@@ -478,7 +478,7 @@ class DocxExtractor {
           ),
         );
       default:
-        // Default start-aligned tab
+      // Default start-aligned tab
         return SizedBox(
           width: tabWidth,
           child: Text(
@@ -508,7 +508,7 @@ class DocxExtractor {
     final String? thickness = borderElement.getAttribute('w:sz');
     final double width = double.tryParse(thickness ?? "8") ?? 8;
     final Color color =
-        borderElement.getAttribute('w:color') != null ? _hexToColor(borderElement.getAttribute('w:color')!) : Colors.transparent;
+    borderElement.getAttribute('w:color') != null ? _hexToColor(borderElement.getAttribute('w:color')!) : Colors.transparent;
 
     return Border.all(color: color, width: width / 8);
   }
@@ -519,7 +519,7 @@ class DocxExtractor {
     }
     final String style = element.getAttribute('w:val') ?? 'single';
     final Color color =
-        element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
+    element.getAttribute('w:color') != null ? _hexToColor(element.getAttribute('w:color')!) : Colors.transparent;
 
     final double width = (double.tryParse(element.getAttribute('w:sz') ?? '0') ?? 0) / 8.0;
 
@@ -709,9 +709,9 @@ class DocxExtractor {
               counter: counters,
             ));
             break;
-          // case 'sectPr':
-          //   widgets.add(_parseSectionProperties(element));
-          // break;
+        // case 'sectPr':
+        //   widgets.add(_parseSectionProperties(element));
+        // break;
         }
       }
     }
@@ -857,8 +857,8 @@ class DocxExtractor {
     }
     // Parse font size (half-points to points)
     final double fontSize = double.tryParse(
-          styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '20',
-        ) ??
+      styleElement.getElement('w:sz')?.getAttribute('w:val') ?? '20',
+    ) ??
         16.0;
 
     // Parse text color (if available)
