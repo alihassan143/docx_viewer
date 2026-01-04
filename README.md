@@ -1,3 +1,9 @@
+# ⚠️ ARCHIVED
+
+**This repository is no longer actively maintained as a standalone package. The source code and future development have moved to the [htmltopdfwidgets monorepo](https://github.com/alihassan143/htmltopdfwidgets/tree/main/packages/docx_file_viewer).**
+
+---
+
 # Flutter DOCX Viewer Package
 
 This Flutter package allows you to view DOCX files in your Flutter applications. It provides a simple way to load and display DOCX content in a Flutter app.
@@ -39,6 +45,7 @@ Below is an example of how to use the DOCX viewer in your Flutter application:
 import 'dart:io';
 import 'package:docx_file_viewer/docx_file_viewer.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
 
 void main() {
   runApp(const MyApp());
